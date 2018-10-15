@@ -1,17 +1,22 @@
 package com.greencomnetworks.franzmanager.services;
 
+import com.greencomnetworks.franzmanager.entities.Broker;
 import com.greencomnetworks.franzmanager.entities.Metric;
+import com.greencomnetworks.franzmanager.resources.BrokersResource;
 import com.greencomnetworks.franzmanager.utils.FUtils;
 import org.apache.commons.lang3.math.NumberUtils;
 import org.apache.kafka.clients.admin.AdminClient;
 import org.apache.kafka.clients.admin.ListTopicsOptions;
 import org.apache.kafka.common.Node;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.management.*;
 import javax.management.remote.JMXConnector;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Set;
@@ -19,6 +24,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.stream.Collectors;
 
 public class TopicMetricsService {
+    private static final Logger logger = LoggerFactory.getLogger(BrokersResource.class);
     private static HashMap<String, HashMap<String, HashMap<String, Metric>>> topicMetrics = new HashMap<>();
 
     public static void init() {
@@ -39,38 +45,31 @@ public class TopicMetricsService {
             while (true) {
                 try {
                     Thread.sleep(15000); // wait 15 sc before first try.
+                    logger.info("Loop kafka topics service");
 
                     HashMap<String, HashMap<String, JMXConnector>> jmxConnector = KafkaMetricsService.getJmxConnectors();
 
                     for (String clusterId : jmxConnector.keySet()) { // for each clusters;
-                        HashMap<String, JMXConnector> clusterMBeanServerConnection = jmxConnector.get(clusterId);
+                        HashMap<String, JMXConnector> jmxConnectors = jmxConnector.get(clusterId);
                         AdminClient adminClient = AdminClientService.getAdminClient(clusterId);
                         ListTopicsOptions listTopicsOptions = new ListTopicsOptions().listInternal(true);
                         Set<String> topics = adminClient.listTopics(listTopicsOptions).names().get();
 
-                        Collection<Node> brokers = adminClient.describeCluster().nodes().get().stream().map(broker -> {
-                            try {
-                                if (broker.host().equals(InetAddress.getLocalHost().getHostName())) {
-                                    return new Node(broker.id(), "127.0.0.1", broker.port(), broker.rack());
-                                }
-                            } catch (UnknownHostException e) {
-                                throw new RuntimeException(e);
-                            }
-                            return broker;
-                        }).collect(Collectors.toList());
 
+                        ArrayList<Broker> knownBrokers = BrokersService.getKnownKafkaBrokers(clusterId);
                         HashMap<String, HashMap<String, Metric>> clusterTopicsMetrics = new HashMap<>();
 
                         topics.forEach(topic -> {
                             HashMap<String, Metric> brokerTopicMetrics = new HashMap<>();
 
-                            for (String brokerHost : clusterMBeanServerConnection.keySet()) { // for each brokers.
+                            for (String brokerHost : jmxConnectors.keySet()) { // for each brokers.
                                 try {
-                                    MBeanServerConnection mbsc = clusterMBeanServerConnection.get(brokerHost).getMBeanServerConnection();
-                                    Node currentBroker = brokers.stream().filter(n -> n.host().equals(brokerHost)).findFirst().get();
+                                    MBeanServerConnection mbsc = jmxConnectors.get(brokerHost).getMBeanServerConnection();
+                                    Broker currentBroker = FUtils.findInCollection(knownBrokers, n -> (n.host + ':' + n.jmxPort).equals(brokerHost));
+
                                     String queryString = "kafka.server:type=BrokerTopicMetrics,name=MessagesInPerSec,topic=" + topic;
                                     String metricName = "MessagesInPerSec";
-                                    Metric metric = new Metric("BrokerTopicMetrics", metricName, currentBroker.id(), new HashMap<>());
+                                    Metric metric = new Metric("BrokerTopicMetrics", metricName, Integer.parseInt(currentBroker.id), new HashMap<>());
                                     ObjectName objName = new ObjectName(queryString);
                                     MBeanInfo beanInfo = mbsc.getMBeanInfo(objName);
                                     for (MBeanAttributeInfo attr : beanInfo.getAttributes()) {
@@ -83,7 +82,7 @@ public class TopicMetricsService {
                                             metric.metrics.put(attr.getName(), value);
                                         }
                                     }
-                                    brokerTopicMetrics.put(currentBroker.idString(), metric);
+                                    brokerTopicMetrics.put(currentBroker.id, metric);
                                 } catch (InstanceNotFoundException | MalformedObjectNameException | AttributeNotFoundException e) {
                                     // we don't care
                                 } catch (IOException | ReflectionException | IntrospectionException | MBeanException e) {
@@ -91,12 +90,11 @@ public class TopicMetricsService {
                                 }
                             }
                             clusterTopicsMetrics.put(topic, brokerTopicMetrics);
-
                         });
 
                         topicMetrics.put(clusterId, clusterTopicsMetrics);
                     }
-                    Thread.sleep(900000); // every 15 minutes
+                    Thread.sleep(30000); // every 5 minutes
                 } catch (InterruptedException | ExecutionException e) {
                     e.printStackTrace();
                 }

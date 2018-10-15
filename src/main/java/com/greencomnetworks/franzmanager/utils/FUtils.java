@@ -20,13 +20,16 @@ import java.util.stream.Collectors;
  * Functional Utils
  */
 public class FUtils {
+    public static <T> T findInCollection(Collection<T> col, Predicate<T> filter) {
+        return col.stream().filter(filter).findFirst().orElse(null);
+    }
 
     public static <T> Optional<T> get(T val) {
         return Optional.ofNullable(val);
     }
 
     public static <T> T getOrElse(T val, T other) {
-        if(val != null) return val;
+        if (val != null) return val;
         return other;
     }
 
@@ -39,12 +42,12 @@ public class FUtils {
     }
 
     public static <T> T getOrElseGet(T val, Supplier<? extends T> otherSupplier) {
-        if(val != null) return val;
+        if (val != null) return val;
         return otherSupplier.get();
     }
 
     public static <T, X extends Throwable> T getOrThrow(T val, Supplier<X> throwableSupplier) throws X {
-        if(val != null) return val;
+        if (val != null) return val;
         throw throwableSupplier.get();
     }
 
@@ -64,57 +67,73 @@ public class FUtils {
         }
     }
 
+    public static void setTimeout(Runnable runnable, int delay){
+        new Thread(() -> {
+            try {
+                Thread.sleep(delay);
+                runnable.run();
+            }
+            catch (Exception e){
+                System.err.println(e);
+            }
+        }).start();
+    }
+
     public static void fatalExit(long timeout) {
-        if(timeout > 0) {
-            try { Thread.sleep(timeout); } catch(InterruptedException e) { /*noop*/ }
+        if (timeout > 0) {
+            try {
+                Thread.sleep(timeout);
+            } catch (InterruptedException e) { /*noop*/ }
         }
         System.exit(1);
     }
 
     public static ZonedDateTime toUTC(ZonedDateTime time) {
-        if(time == null) return null;
+        if (time == null) return null;
         return time.withZoneSameInstant(ZoneOffset.UTC);
     }
 
     public static String toUTCString(ZonedDateTime time) {
-        if(time == null) return null;
+        if (time == null) return null;
         return toUTC(time).toString();
     }
 
     private static DateTimeFormatter dateTimeFormatterHHMMss;
     private static DateTimeFormatter dateTimeFormatterHH;
+
     static {
         dateTimeFormatterHHMMss = new DateTimeFormatterBuilder()
-            .parseCaseInsensitive()
-            .append(DateTimeFormatter.ISO_LOCAL_DATE_TIME)
-            .appendOffset("+HHMMss", "Z")
-            .optionalStart()
-            .appendLiteral('[')
-            .parseCaseSensitive()
-            .appendZoneRegionId()
-            .appendLiteral(']')
-            .toFormatter()
-            .withResolverStyle(ResolverStyle.STRICT)
-            .withChronology(IsoChronology.INSTANCE);
+                .parseCaseInsensitive()
+                .append(DateTimeFormatter.ISO_LOCAL_DATE_TIME)
+                .appendOffset("+HHMMss", "Z")
+                .optionalStart()
+                .appendLiteral('[')
+                .parseCaseSensitive()
+                .appendZoneRegionId()
+                .appendLiteral(']')
+                .toFormatter()
+                .withResolverStyle(ResolverStyle.STRICT)
+                .withChronology(IsoChronology.INSTANCE);
         dateTimeFormatterHH = new DateTimeFormatterBuilder()
-            .parseCaseInsensitive()
-            .append(DateTimeFormatter.ISO_LOCAL_DATE_TIME)
-            .appendOffset("+HH", "Z")
-            .optionalStart()
-            .appendLiteral('[')
-            .parseCaseSensitive()
-            .appendZoneRegionId()
-            .appendLiteral(']')
-            .toFormatter()
-            .withResolverStyle(ResolverStyle.STRICT)
-            .withChronology(IsoChronology.INSTANCE);
+                .parseCaseInsensitive()
+                .append(DateTimeFormatter.ISO_LOCAL_DATE_TIME)
+                .appendOffset("+HH", "Z")
+                .optionalStart()
+                .appendLiteral('[')
+                .parseCaseSensitive()
+                .appendZoneRegionId()
+                .appendLiteral(']')
+                .toFormatter()
+                .withResolverStyle(ResolverStyle.STRICT)
+                .withChronology(IsoChronology.INSTANCE);
     }
+
     public static ZonedDateTime parseZonedDateTime(String time) {
-        if(time == null) return null;
+        if (time == null) return null;
         try {
             try {
                 return ZonedDateTime.parse(time);
-            } catch(DateTimeParseException e) {
+            } catch (DateTimeParseException e) {
                 // The default parse expect an offset of the form "+HH:MM:ss"
                 // But the form "+HHMMss" is also a valid form.
                 try {
@@ -124,7 +143,7 @@ public class FUtils {
                     return ZonedDateTime.parse(time, dateTimeFormatterHH);
                 }
             }
-        } catch(RuntimeException e) {
+        } catch (RuntimeException e) {
             return null;
         }
     }
@@ -191,10 +210,11 @@ public class FUtils {
 
         @SuppressWarnings("unchecked")
         public static <U, V> java.util.Map<U, V> of(Object... fields) {
-            if(fields.length % 2 != 0) throw new IllegalArgumentException(fields.length + " arguments provided, require an even number of arguments");
+            if (fields.length % 2 != 0)
+                throw new IllegalArgumentException(fields.length + " arguments provided, require an even number of arguments");
             java.util.Map<U, V> builder = new HashMap<>();
             for (int i = 0; i < fields.length; i += 2) {
-                builder.put((U) fields[i], (V) fields[i+1]);
+                builder.put((U) fields[i], (V) fields[i + 1]);
             }
             return builder;
         }
@@ -228,10 +248,10 @@ public class FUtils {
 
             public MapBuilder<U, V> filter(Predicate<? super java.util.Map.Entry<U, V>> predicate) {
                 map = map.entrySet().stream()
-                    .filter(predicate)
-                    .collect(Collectors.toMap(
-                        java.util.Map.Entry::getKey,
-                        java.util.Map.Entry::getValue));
+                        .filter(predicate)
+                        .collect(Collectors.toMap(
+                                java.util.Map.Entry::getKey,
+                                java.util.Map.Entry::getValue));
 
                 return this;
             }
@@ -260,10 +280,11 @@ public class FUtils {
 
         @SuppressWarnings("unchecked")
         public static <V> java.util.Map<String, V> of(Object... fields) {
-            if(fields.length % 2 != 0) throw new IllegalArgumentException(fields.length + " arguments provided, require an even number of arguments");
+            if (fields.length % 2 != 0)
+                throw new IllegalArgumentException(fields.length + " arguments provided, require an even number of arguments");
             java.util.Map<String, V> builder = new HashMap<>();
             for (int i = 0; i < fields.length; i += 2) {
-                builder.put((String) fields[i], (V) fields[i+1]);
+                builder.put((String) fields[i], (V) fields[i + 1]);
             }
             return builder;
         }

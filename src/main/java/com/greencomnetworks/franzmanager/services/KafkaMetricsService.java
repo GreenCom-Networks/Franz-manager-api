@@ -1,10 +1,11 @@
 package com.greencomnetworks.franzmanager.services;
 
 import com.greencomnetworks.franzmanager.entities.Cluster;
+import org.apache.kafka.clients.admin.AdminClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.management.MBeanServerConnection;
+import javax.management.*;
 import javax.management.remote.JMXConnector;
 import javax.management.remote.JMXConnectorFactory;
 import javax.management.remote.JMXServiceURL;
@@ -14,37 +15,38 @@ import java.util.HashMap;
 
 public class KafkaMetricsService {
     private static final Logger logger = LoggerFactory.getLogger(KafkaMetricsService.class);
-    private static HashMap<String, HashMap<String, MBeanServerConnection>> mBeanServerConnections = new HashMap<>();
+    private static HashMap<String, HashMap<String, JMXConnector>> jmxConnector = new HashMap<>();
 
     public static void init() {
+        logger.info("Starting jmx connectivity check loop");
         new Thread(new JmxConnectivityCheck(), "JmxConnectivityCheck").start();
     }
 
-    public static HashMap<String, MBeanServerConnection> getMBeanServerConnection(String clusterId) {
+    public static HashMap<String, JMXConnector> getJmxConnector(String clusterId) {
         if (clusterId == null) {
             clusterId = "Default";
         }
-        return mBeanServerConnections.get(clusterId);
+        return jmxConnector.get(clusterId);
     }
 
-    public static HashMap<String, HashMap<String, MBeanServerConnection>> getMBeanServerConnections() {
-        return mBeanServerConnections;
+    public static HashMap<String, HashMap<String, JMXConnector>> getJmxConnectors() {
+        return jmxConnector;
     }
-
 
     private static class JmxConnectivityCheck implements Runnable {
         public void run() {
             while (true) {
                 try {
+                    logger.info("Loop kafka metrics service");
                     ConstantsService.clusters.forEach(cluster -> {
-                        mBeanServerConnections.put(cluster.name, new HashMap<>());
+                        jmxConnector.computeIfAbsent(cluster.name, k -> new HashMap<>());
                         for (String url : cluster.jmxConnectString.split(",")) {
-                            HashMap<String, MBeanServerConnection> mbsc = mBeanServerConnections.get(cluster.name);
-                            if (mbsc.get(url.split(":")[0]) == null
-                                /*|| mBeanServerConnections.get(url.split(":")[0]) == null*/) {
+                            HashMap<String, JMXConnector> mbscs = jmxConnector.get(cluster.name);
+                            try {
+                                mbscs.get(url).getMBeanServerConnection();
+                            } catch (IOException | NullPointerException e) {
+                                logger.info("Connecting to jmx -- url: " + url.split(":")[0] + " -- cluster: " + cluster.name);
                                 connectJmx(cluster, url);
-                            } else {
-                                logger.warn(mbsc.get(url.split(":")[0]).toString());
                             }
                         }
                     });
@@ -59,13 +61,14 @@ public class KafkaMetricsService {
             try {
                 JMXServiceURL jmxUrl = new JMXServiceURL("service:jmx:rmi:///jndi/rmi://" + url + "/jmxrmi");
                 JMXConnector jmxc = JMXConnectorFactory.connect(jmxUrl, null);
-                mBeanServerConnections.get(cluster.name).put(url.split(":")[0], jmxc.getMBeanServerConnection());
+                jmxConnector.get(cluster.name).put(url, jmxc);
+                logger.info("__ connected " + url + " -- " + cluster.name);
             } catch (MalformedURLException e) {
                 throw new RuntimeException("The following url has a bad format : " + url, e);
             } catch (IOException e) {
                 logger.error("Cannot connect to the following url '{}': {}", url, e.getMessage());
                 try {
-                    Thread.sleep(10000);
+                    Thread.sleep(1000);
                 } catch (InterruptedException e1) {
                     // don't care.
                 }

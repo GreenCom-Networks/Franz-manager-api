@@ -1,7 +1,9 @@
 package com.greencomnetworks.franzmanager.resources;
 
+import com.greencomnetworks.franzmanager.entities.Broker;
 import com.greencomnetworks.franzmanager.entities.Metric;
 import com.greencomnetworks.franzmanager.services.AdminClientService;
+import com.greencomnetworks.franzmanager.services.BrokersService;
 import com.greencomnetworks.franzmanager.services.KafkaMetricsService;
 import com.greencomnetworks.franzmanager.services.TopicMetricsService;
 import com.greencomnetworks.franzmanager.utils.FUtils;
@@ -14,16 +16,15 @@ import org.slf4j.LoggerFactory;
 
 import javax.management.*;
 import javax.management.openmbean.CompositeData;
+import javax.management.remote.JMXConnector;
 import javax.ws.rs.*;
 import javax.ws.rs.core.MediaType;
 import java.io.IOException;
-import java.lang.management.MemoryUsage;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.util.*;
 import java.util.concurrent.ExecutionException;
 import java.util.stream.Collectors;
-
 
 @Path("/metrics")
 @Consumes(MediaType.APPLICATION_JSON)
@@ -31,12 +32,12 @@ import java.util.stream.Collectors;
 public class MetricsResource {
     private static final Logger logger = LoggerFactory.getLogger(MetricsResource.class);
 
-    private HashMap<String, MBeanServerConnection> mBeanServerConnections;
+    private HashMap<String, JMXConnector> jmxConnectors;
     private AdminClient adminClient;
     private String clusterId;
 
     public MetricsResource(@HeaderParam("clusterId") String clusterId) {
-        this.mBeanServerConnections = KafkaMetricsService.getMBeanServerConnection(clusterId);
+        this.jmxConnectors = KafkaMetricsService.getJmxConnector(clusterId);
         this.adminClient = AdminClientService.getAdminClient(clusterId);
         this.clusterId = clusterId;
     }
@@ -63,24 +64,16 @@ public class MetricsResource {
         }
 
         ObjectName objName = new ObjectName(queryString);
-        HashMap<String, MBeanServerConnection> mbscs = mBeanServerConnections;
-        Collection<Node> brokers = adminClient.describeCluster().nodes().get().stream().map(broker -> {
-            try {
-                if (broker.host().equals(InetAddress.getLocalHost().getHostName())) {
-                    return new Node(broker.id(), "127.0.0.1", broker.port(), broker.rack());
-                }
-            } catch (UnknownHostException e) {
-                throw new RuntimeException(e);
-            }
-            return broker;
-        }).collect(Collectors.toList());
+        ArrayList<Broker> knownKafkaBrokers = BrokersService.getKnownKafkaBrokers(clusterId);
         List<Metric> metrics = new ArrayList<>();
-
-        for (String brokerHost : mbscs.keySet()) {
+        for (String brokerHost : jmxConnectors.keySet()) {
             try {
-                MBeanServerConnection mbsc = mbscs.get(brokerHost);
-                Node currentBroker = brokers.stream().filter(n -> n.host().equals(brokerHost)).findFirst().get();
-                Metric metric = new Metric(metricType, metricName, currentBroker.id(), new HashMap<>());
+                MBeanServerConnection mbsc = jmxConnectors.get(brokerHost).getMBeanServerConnection();
+                String host = brokerHost.split(":")[0];
+                Integer port = Integer.parseInt(brokerHost.split(":")[1]);
+                logger.warn(host + " , " + port);
+                Broker currentBroker = FUtils.findInCollection(knownKafkaBrokers, b -> b.jmxPort.equals(port) && b.host.equals(host));
+                Metric metric = new Metric(metricType, metricName, Integer.parseInt(currentBroker.id), new HashMap<>());
                 MBeanInfo beanInfo = mbsc.getMBeanInfo(objName);
                 for (MBeanAttributeInfo attr : beanInfo.getAttributes()) {
                     if (metricName != null && metricName.equals("HeapMemoryUsage")) { //specific case for this metric
@@ -104,8 +97,10 @@ public class MetricsResource {
             } catch (IntrospectionException e) {
                 // that means a jmx server is not available
                 logger.warn("A jmx server cannot be reached : {}", e.getMessage());
-            } catch (InstanceNotFoundException | NoSuchElementException e) {
-                logger.warn("Cannot retrieved this metric {{}}, maybe your kafka need to be upgraded.", queryString);
+            } catch (InstanceNotFoundException | NoSuchElementException | NullPointerException e) {
+                logger.warn("Cannot retrieved this metric {{}}.", queryString);
+            } catch (IOException e) {
+                logger.warn("A jmx connection is broken.", queryString);
             }
         }
         return metrics;

@@ -1,10 +1,7 @@
 package com.greencomnetworks.franzmanager;
 
 import com.greencomnetworks.franzmanager.resources.LiveMessagesResource;
-import com.greencomnetworks.franzmanager.services.ConstantsService;
-import com.greencomnetworks.franzmanager.services.KafkaConsumerOffsetReader;
-import com.greencomnetworks.franzmanager.services.KafkaMetricsService;
-import com.greencomnetworks.franzmanager.services.TopicMetricsService;
+import com.greencomnetworks.franzmanager.services.*;
 import com.greencomnetworks.franzmanager.utils.FUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.glassfish.grizzly.http.server.*;
@@ -50,7 +47,7 @@ public class FranzManagerApi {
 
         // Add tracing capabilities when run in local
         // Header to set to enable trace:  X-Jersey-Tracing-Accept
-        if(StringUtils.equals(System.getenv("ENV"), "LOCAL")) {
+        if (StringUtils.equals(System.getenv("ENV"), "LOCAL")) {
             config.addProperties(FUtils.SMap.builder()
                     .put("jersey.config.server.tracing.type", "ON_DEMAND")
                     .put("jersey.config.server.tracing.threshold", "VERBOSE")
@@ -79,6 +76,9 @@ public class FranzManagerApi {
         KafkaConsumerOffsetReader.init();
         KafkaMetricsService.init();
         TopicMetricsService.init();
+        ZookeeperService.init();
+        BrokersService.init();
+
         // Set Worker Pool Size
         for (NetworkListener listener : server.getListeners()) {
             listener.getTransport().getWorkerThreadPoolConfig().setMaxPoolSize(apiConfig.listenerWorkersCount);

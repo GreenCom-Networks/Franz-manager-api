@@ -8,6 +8,7 @@ import org.apache.kafka.clients.admin.ListTopicsOptions;
 import org.apache.kafka.common.Node;
 
 import javax.management.*;
+import javax.management.remote.JMXConnector;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
@@ -39,10 +40,10 @@ public class TopicMetricsService {
                 try {
                     Thread.sleep(15000); // wait 15 sc before first try.
 
-                    HashMap<String, HashMap<String, MBeanServerConnection>> mBeanServerConnections = KafkaMetricsService.getMBeanServerConnections();
+                    HashMap<String, HashMap<String, JMXConnector>> jmxConnector = KafkaMetricsService.getJmxConnectors();
 
-                    for (String clusterId : mBeanServerConnections.keySet()) { // for each clusters;
-                        HashMap<String, MBeanServerConnection> clusterMBeanServerConnection = mBeanServerConnections.get(clusterId);
+                    for (String clusterId : jmxConnector.keySet()) { // for each clusters;
+                        HashMap<String, JMXConnector> clusterMBeanServerConnection = jmxConnector.get(clusterId);
                         AdminClient adminClient = AdminClientService.getAdminClient(clusterId);
                         ListTopicsOptions listTopicsOptions = new ListTopicsOptions().listInternal(true);
                         Set<String> topics = adminClient.listTopics(listTopicsOptions).names().get();
@@ -65,7 +66,7 @@ public class TopicMetricsService {
 
                             for (String brokerHost : clusterMBeanServerConnection.keySet()) { // for each brokers.
                                 try {
-                                    MBeanServerConnection mbsc = clusterMBeanServerConnection.get(brokerHost);
+                                    MBeanServerConnection mbsc = clusterMBeanServerConnection.get(brokerHost).getMBeanServerConnection();
                                     Node currentBroker = brokers.stream().filter(n -> n.host().equals(brokerHost)).findFirst().get();
                                     String queryString = "kafka.server:type=BrokerTopicMetrics,name=MessagesInPerSec,topic=" + topic;
                                     String metricName = "MessagesInPerSec";

@@ -108,7 +108,7 @@ public class TopicsResource {
         }
 
         BrokersResource brokersResource = new BrokersResource(clusterId);
-        Broker clusterConfig = brokersResource.getBrokers().get(0);
+        Broker clusterConfig = brokersResource.getBrokers(true).get(0);
 
         int partitions = topic.partitions != null ? topic.partitions : Integer.parseInt(clusterConfig.configurations.get("num.partitions"));
         int replicationFactor = topic.replications != null ? topic.replications : Integer.parseInt(clusterConfig.configurations.get("default.replication.factor"));

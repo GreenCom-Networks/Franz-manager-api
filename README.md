@@ -16,6 +16,7 @@ The api needs 2 environment variables to work :
 * `KAFKA_BROKERS_JMX` (ie -> '127.0.0.2:9997,127.0.0.3:9997,127.0.0.4:9997')
 
 ###### /!\ Breaking change (commit cd17843b82611864f7cd24693f399ce47f78a64b)
+###### /!\ Breaking change 2 (commit b57e5f2c00382e5e1dea067ca96098c9ef78cf01)
 
 Franz-manager now supports multiple clusters, the 2 previous environment variables are not used anymore.
 You need to set this one:
@@ -25,13 +26,15 @@ You need to set this one:
 [
      {
          "name": "cluster 1",
-         "brokersConnectString": "127.0.0.2:2181,127.0.0.3:2181,127.0.0.4:2181",
-         "jmxConnectString": "127.0.0.2:9997,127.0.0.3:9997,127.0.0.4:9997"
+         "brokersConnectString": "127.0.0.2:9092,127.0.0.3:9092,127.0.0.4:9092",
+         "jmxConnectString": "127.0.0.2:9997,127.0.0.3:9997,127.0.0.4:9997",
+         "jmxConnectString": "127.0.0.2:2181,127.0.0.3:2181,127.0.0.4:2181"
      },
      {
          "name": "cluster 2",
-         "brokersConnectString": "127.0.0.5:2181,127.0.0.6:2181,127.0.0.7:2181",
-         "jmxConnectString": "127.0.0.5:9997,127.0.0.6:9997,127.0.0.7:9997"
+         "brokersConnectString": "127.0.0.5:9092,127.0.0.6:9092,127.0.0.7:9092",
+         "jmxConnectString": "127.0.0.5:9997,127.0.0.6:9997,127.0.0.7:9997",
+         "jmxConnectString": "127.0.0.2:2181,127.0.0.3:2181,127.0.0.4:2181"
      }
 ]
 ```

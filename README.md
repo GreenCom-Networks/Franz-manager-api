@@ -15,8 +15,7 @@ The api needs 2 environment variables to work :
 
 * `KAFKA_BROKERS_JMX` (ie -> '127.0.0.2:9997,127.0.0.3:9997,127.0.0.4:9997')
 
-###### /!\ Breaking change (commit cd17843b82611864f7cd24693f399ce47f78a64b)
-###### /!\ Breaking change 2 (commit b57e5f2c00382e5e1dea067ca96098c9ef78cf01)
+###### /!\ Breaking change (commit b57e5f2c00382e5e1dea067ca96098c9ef78cf01)
 
 Franz-manager now supports multiple clusters, the 2 previous environment variables are not used anymore.
 You need to set this one:

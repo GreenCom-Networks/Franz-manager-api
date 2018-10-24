@@ -27,13 +27,13 @@ You need to set this one:
          "name": "cluster 1",
          "brokersConnectString": "127.0.0.2:9092,127.0.0.3:9092,127.0.0.4:9092",
          "jmxConnectString": "127.0.0.2:9997,127.0.0.3:9997,127.0.0.4:9997",
-         "jmxConnectString": "127.0.0.2:2181,127.0.0.3:2181,127.0.0.4:2181"
+         "zookeeperConnectString": "127.0.0.2:2181,127.0.0.3:2181,127.0.0.4:2181"
      },
      {
          "name": "cluster 2",
          "brokersConnectString": "127.0.0.5:9092,127.0.0.6:9092,127.0.0.7:9092",
          "jmxConnectString": "127.0.0.5:9997,127.0.0.6:9997,127.0.0.7:9997",
-         "jmxConnectString": "127.0.0.2:2181,127.0.0.3:2181,127.0.0.4:2181"
+         "zookeeperConnectString": "127.0.0.2:2181,127.0.0.3:2181,127.0.0.4:2181"
      }
 ]
 ```

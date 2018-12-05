@@ -45,7 +45,6 @@ public class TopicMetricsService {
             while (true) {
                 try {
                     Thread.sleep(15000); // wait 15 sc before first try.
-                    logger.info("Loop kafka topics service");
 
                     HashMap<String, HashMap<String, JMXConnector>> jmxConnector = KafkaMetricsService.getJmxConnectors();
 

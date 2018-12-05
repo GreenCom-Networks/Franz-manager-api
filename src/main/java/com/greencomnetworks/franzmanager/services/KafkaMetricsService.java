@@ -37,7 +37,6 @@ public class KafkaMetricsService {
         public void run() {
             while (true) {
                 try {
-                    logger.info("Loop kafka metrics service");
                     ConstantsService.clusters.forEach(cluster -> {
                         jmxConnector.computeIfAbsent(cluster.name, k -> new HashMap<>());
                         for (String url : cluster.jmxConnectString.split(",")) {

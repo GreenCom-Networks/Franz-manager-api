@@ -31,12 +31,9 @@ public class BrokersService {
         public void run() {
             try {
                 while (true) {
-                    logger.info("Loop zookeeper service.");
                     ConstantsService.clusters.forEach(cluster -> {
                         ArrayList<Broker> knownKafkaBrokers = clustersKnownKafkaBrokers.computeIfAbsent(cluster.name, n -> new ArrayList<>());
                         ArrayList<Broker> currentKafkaBrokers = this.getCurrentKafkaBrokers(cluster.name);
-
-                        logger.info(currentKafkaBrokers.toString());
 
                         // check unknown brokers
                         currentKafkaBrokers.forEach(broker -> {

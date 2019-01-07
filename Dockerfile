@@ -6,7 +6,7 @@ WORKDIR /app
 
 RUN mvn clean package
 
-FROM java:8-alpine
+FROM openjdk:8-jdk-alpine
 
 ENV APP franz-manager-api
 
@@ -18,4 +18,4 @@ RUN apk update && apk add --no-cache libc6-compat
 
 COPY --from=builder /app/target/$APP-jar-with-dependencies.jar $APP.jar
 
-CMD java -Xmx${JVM_HEAP_SIZE}m -XX:+ExitOnOutOfMemoryError -jar $APP.jar
+CMD java -Xmx${JVM_HEAP_SIZE:-1024}m -XX:+ExitOnOutOfMemoryError -jar $APP.jar

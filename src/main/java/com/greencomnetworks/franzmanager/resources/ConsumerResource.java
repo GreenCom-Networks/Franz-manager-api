@@ -1,7 +1,10 @@
 package com.greencomnetworks.franzmanager.resources;
 
+import com.greencomnetworks.franzmanager.entities.Cluster;
 import com.greencomnetworks.franzmanager.entities.ConsumerOffsetRecord;
+import com.greencomnetworks.franzmanager.services.ConstantsService;
 import com.greencomnetworks.franzmanager.services.KafkaConsumerOffsetReader;
+import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -18,9 +21,19 @@ public class ConsumerResource {
     private static final Logger log = LoggerFactory.getLogger(ConsumerResource.class);
 
     String clusterId;
+    Cluster cluster;
 
     public ConsumerResource(@HeaderParam("clusterId") String clusterId){
         this.clusterId = clusterId;
+        for (Cluster cluster : ConstantsService.clusters) {
+            if(StringUtils.equals(cluster.name, clusterId)){
+                this.cluster = cluster;
+                break;
+            }
+        }
+        if(this.cluster == null){
+            throw new NotFoundException("Cluster not found for id " + clusterId);
+        }
     }
 
     @GET
@@ -43,7 +56,7 @@ public class ConsumerResource {
         Collection<ConsumerOffsetRecord> result = new ArrayList<>();
 
         for(ConsumerOffsetRecord record : consumerOffsetRecords){
-            if(record.getGroup().equals(group)){
+            if(StringUtils.equals(record.group, group)) {
                 result.add(record);
             }
         }
@@ -57,7 +70,7 @@ public class ConsumerResource {
         Collection<ConsumerOffsetRecord> result = new ArrayList<>();
 
         for(ConsumerOffsetRecord record : consumerOffsetRecords){
-            if(record.getTopic().equals(topic)){
+            if(StringUtils.equals(record.topic, topic)) {
                 result.add(record);
             }
         }

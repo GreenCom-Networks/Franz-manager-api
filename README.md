@@ -64,5 +64,3 @@ Apidoc can be found here --> [localhost:1337/franz-manager-api/apidoc/](http://l
 
 `docker run -e JVM_HEAP_SIZE=512 -e KAFKA_BROKERS="YOUR_KAFKA_BROKERS_STRING" -e KAFKA_BROKERS_JMX="YOUR_KAFKA_BROKERS_JMX"  -p 1337:1337 greencomnetworks/franz-manager-api`
 
-enjoy !
-

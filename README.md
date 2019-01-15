@@ -1,6 +1,6 @@
 ### Franz-manager-api
 
-This api should work with the front-end franz-manager --> [here](https://github.com/GreenCom-Networks/Franz-manager)
+This api should work with the front-end franz-manager --> [github](https://github.com/GreenCom-Networks/Franz-manager), [dockerhub](https://hub.docker.com/r/greencomnetworks/franz-manager)
 
 ### Environment variables
 

@@ -1,11 +1,9 @@
 package com.greencomnetworks.franzmanager.services;
 
 import com.greencomnetworks.franzmanager.entities.Cluster;
-import org.apache.kafka.clients.admin.AdminClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.management.*;
 import javax.management.remote.JMXConnector;
 import javax.management.remote.JMXConnectorFactory;
 import javax.management.remote.JMXServiceURL;

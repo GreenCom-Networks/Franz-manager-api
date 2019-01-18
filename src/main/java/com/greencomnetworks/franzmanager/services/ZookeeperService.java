@@ -1,5 +1,6 @@
 package com.greencomnetworks.franzmanager.services;
 
+import com.greencomnetworks.franzmanager.entities.Cluster;
 import com.greencomnetworks.franzmanager.resources.BrokersResource;
 import org.apache.zookeeper.ZooKeeper;
 import org.slf4j.Logger;
@@ -14,18 +15,17 @@ public class ZookeeperService {
     private static Map<String, ZooKeeper> zookeeperConnections = new HashMap<>();
 
     public static void init() {
-        ConstantsService.clusters.forEach(cluster -> {
-            ZooKeeper zooKeeper;
+        for(Cluster cluster : ConstantsService.clusters) {
             try {
-                zooKeeper = new ZooKeeper(cluster.zookeeperConnectString, 5000, null);
+                ZooKeeper zooKeeper = new ZooKeeper(cluster.zookeeperConnectString, 5000, null);
+                zookeeperConnections.put(cluster.name, zooKeeper);
             } catch (IOException e) {
                 throw new RuntimeException("Cannot connect to zookeeper " + cluster.zookeeperConnectString);
             }
-            zookeeperConnections.put(cluster.name, zooKeeper);
-        });
+        }
     }
 
     public static ZooKeeper getZookeeperConnection(String clusterId) {
-        return zookeeperConnections.getOrDefault(clusterId, null);
+        return zookeeperConnections.get(clusterId);
     }
 }

@@ -17,7 +17,9 @@ public class ZookeeperService {
     public static void init() {
         for(Cluster cluster : ConstantsService.clusters) {
             try {
-                ZooKeeper zooKeeper = new ZooKeeper(cluster.zookeeperConnectString, 5000, null);
+                ZooKeeper zooKeeper = new ZooKeeper(cluster.zookeeperConnectString, 5000, event -> {
+                    // TODO: use proper watcher
+                });
                 zookeeperConnections.put(cluster.name, zooKeeper);
             } catch (IOException e) {
                 throw new RuntimeException("Cannot connect to zookeeper " + cluster.zookeeperConnectString);

@@ -2,6 +2,7 @@ package com.greencomnetworks.franzmanager.services;
 
 import com.greencomnetworks.franzmanager.entities.ConsumerOffsetRecord;
 import com.greencomnetworks.franzmanager.utils.KafkaUtils;
+import org.apache.commons.lang3.RandomUtils;
 import org.apache.kafka.clients.CommonClientConfigs;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
@@ -36,6 +37,7 @@ public class KafkaConsumerOffsetReader {
 
     private static final String CONSUMER_OFFSET_TOPIC = "__consumer_offsets";
     private static final String CONSUMER_GROUP_ID = "franz-manager-api_consumer-offset-reader";
+    private static final String CONSUMER_CLIENT_ID = CONSUMER_GROUP_ID + "_" + System.getenv("HOSTNAME");
 
     public static class GroupMetadataSchemas {
         public static Schema OFFSET_COMMIT_KEY_SCHEMA = new Schema(
@@ -115,7 +117,7 @@ public class KafkaConsumerOffsetReader {
 
         Map<String, Object> config = new HashMap<>();
         config.put(CommonClientConfigs.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
-        config.put(CommonClientConfigs.CLIENT_ID_CONFIG, CONSUMER_GROUP_ID);
+        config.put(CommonClientConfigs.CLIENT_ID_CONFIG, CONSUMER_CLIENT_ID + "_" + clusterId);
         config.put(ConsumerConfig.GROUP_ID_CONFIG, CONSUMER_GROUP_ID);
         config.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, false);
         config.put(ConsumerConfig.EXCLUDE_INTERNAL_TOPICS_CONFIG, false);

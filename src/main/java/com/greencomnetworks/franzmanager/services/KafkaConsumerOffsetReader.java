@@ -125,100 +125,104 @@ public class KafkaConsumerOffsetReader {
         Thread thread = new Thread(() -> {
             try {
                 while (running.get()) {
-                    Map<String, ConsumerOffsetRecord> consumerOffsetRecords = new HashMap<>();
-                    consumerOffsetRecordArray.put(clusterId, consumerOffsetRecords);
+                    try {
+                        Map<String, ConsumerOffsetRecord> consumerOffsetRecords = new HashMap<>();
+                        consumerOffsetRecordArray.put(clusterId, consumerOffsetRecords);
 
-                    // TODO: add hook to update the topicPartitions when they are updated, it might be safer to use a subscribe here
-                    // with auto commit disabled, and a unique groupId for each instance.
-                    //                                       lgaillard - 30/08/2018
-                    List<TopicPartition> topicPartitions = KafkaUtils.topicPartitionsOf(consumer, CONSUMER_OFFSET_TOPIC);
-                    consumer.assign(topicPartitions);
-                    consumer.seekToBeginning(topicPartitions);
-                    while (running.get()) {
-                        try {
-                            ConsumerRecords<ByteBuffer, ByteBuffer> records = consumer.poll(Duration.ofMillis(100));
+                        // TODO: add hook to update the topicPartitions when they are updated, it might be safer to use a subscribe here
+                        // with auto commit disabled, and a unique groupId for each instance.
+                        //                                       lgaillard - 30/08/2018
+                        List<TopicPartition> topicPartitions = KafkaUtils.topicPartitionsOf(consumer, CONSUMER_OFFSET_TOPIC);
+                        consumer.assign(topicPartitions);
+                        consumer.seekToBeginning(topicPartitions);
+                        while(running.get()) {
+                            try {
+                                ConsumerRecords<ByteBuffer, ByteBuffer> records = consumer.poll(Duration.ofMillis(100));
 
-                            for (ConsumerRecord<ByteBuffer, ByteBuffer> record : records) {
-                                ByteBuffer keyByteBuffer = record.key();
-                                ByteBuffer valueByteBuffer = record.value();
+                                for(ConsumerRecord<ByteBuffer, ByteBuffer> record : records) {
+                                    ByteBuffer keyByteBuffer = record.key();
+                                    ByteBuffer valueByteBuffer = record.value();
 
-                                try {
-                                    Short keyVersion = keyByteBuffer.getShort();
+                                    try {
+                                        Short keyVersion = keyByteBuffer.getShort();
 
-                                    if (keyVersion < 2) { // Group consumption offset
-                                        ConsumerOffsetRecord consumerOffsetRecord = new ConsumerOffsetRecord();
+                                        if(keyVersion < 2) { // Group consumption offset
+                                            ConsumerOffsetRecord consumerOffsetRecord = new ConsumerOffsetRecord();
 
-                                        consumerOffsetRecord.timestamp = ZonedDateTime.now();
+                                            consumerOffsetRecord.timestamp = ZonedDateTime.now();
 
-                                        { // Read key
-                                            Struct struct = OFFSET_COMMIT_KEY_SCHEMA.read(keyByteBuffer);
+                                            { // Read key
+                                                Struct struct = OFFSET_COMMIT_KEY_SCHEMA.read(keyByteBuffer);
 
-                                            consumerOffsetRecord.group = struct.getString(OFFSET_KEY_GROUP_FIELD);
-                                            consumerOffsetRecord.topic = struct.getString(OFFSET_KEY_TOPIC_FIELD);
-                                            consumerOffsetRecord.partition = struct.getInt(OFFSET_KEY_PARTITION_FIELD);
-                                        }
+                                                consumerOffsetRecord.group = struct.getString(OFFSET_KEY_GROUP_FIELD);
+                                                consumerOffsetRecord.topic = struct.getString(OFFSET_KEY_TOPIC_FIELD);
+                                                consumerOffsetRecord.partition = struct.getInt(OFFSET_KEY_PARTITION_FIELD);
+                                            }
 
-                                        String messageKey = consumerOffsetRecord.group + "." + consumerOffsetRecord.topic + "." + consumerOffsetRecord.partition;
+                                            String messageKey = consumerOffsetRecord.group + "." + consumerOffsetRecord.topic + "." + consumerOffsetRecord.partition;
 
-                                        if (valueByteBuffer == null) { // Tombstone
-                                            consumerOffsetRecords.remove(messageKey);
-                                        } else {
-                                            short valueVersion = valueByteBuffer.getShort();
-                                            logger.debug("Value Version is " + valueVersion);
-                                            if(valueVersion == 0) {
-                                                Struct struct = OFFSET_COMMIT_VALUE_SCHEMA_V0.read(valueByteBuffer);
-
-                                                consumerOffsetRecord.offset = struct.getLong(OFFSET_VALUE_OFFSET_FIELD_V0);
-                                                consumerOffsetRecord.metadata = struct.getString(OFFSET_VALUE_METADATA_FIELD_V0);
-                                                consumerOffsetRecord.commitTimestamp = ZonedDateTime.ofInstant(
-                                                    Instant.ofEpochMilli(struct.getLong(OFFSET_VALUE_TIMESTAMP_FIELD_V0)), ZoneOffset.UTC);
-                                            } else if(valueVersion == 1) {
-                                                Struct struct = OFFSET_COMMIT_VALUE_SCHEMA_V1.read(valueByteBuffer);
-
-                                                consumerOffsetRecord.offset = struct.getLong(OFFSET_VALUE_OFFSET_FIELD_V1);
-                                                consumerOffsetRecord.metadata = struct.getString(OFFSET_VALUE_METADATA_FIELD_V1);
-                                                consumerOffsetRecord.commitTimestamp = ZonedDateTime.ofInstant(
-                                                    Instant.ofEpochMilli(struct.getLong(OFFSET_VALUE_COMMIT_TIMESTAMP_FIELD_V1)), ZoneOffset.UTC);
-                                                consumerOffsetRecord.expireTimestamp = ZonedDateTime.ofInstant(
-                                                    Instant.ofEpochMilli(struct.getLong(OFFSET_VALUE_EXPIRE_TIMESTAMP_FIELD_V1)), ZoneOffset.UTC);
-                                            } else if(valueVersion == 2) {
-                                                Struct struct = OFFSET_COMMIT_VALUE_SCHEMA_V2.read(valueByteBuffer);
-
-                                                consumerOffsetRecord.offset = struct.getLong(OFFSET_VALUE_OFFSET_FIELD_V2);
-                                                consumerOffsetRecord.metadata = struct.getString(OFFSET_VALUE_METADATA_FIELD_V2);
-                                                consumerOffsetRecord.commitTimestamp = ZonedDateTime.ofInstant(
-                                                    Instant.ofEpochMilli(struct.getLong(OFFSET_VALUE_COMMIT_TIMESTAMP_FIELD_V2)), ZoneOffset.UTC);
-                                            } else if(valueVersion == 3) {
-                                                Struct struct = OFFSET_COMMIT_VALUE_SCHEMA_V3.read(valueByteBuffer);
-
-                                                consumerOffsetRecord.offset = struct.getLong(OFFSET_VALUE_OFFSET_FIELD_V3);
-                                                consumerOffsetRecord.leaderEpoch = struct.getInt(OFFSET_VALUE_LEADER_EPOCH_FIELD_V3);
-                                                consumerOffsetRecord.metadata = struct.getString(OFFSET_VALUE_METADATA_FIELD_V3);
-                                                consumerOffsetRecord.commitTimestamp = ZonedDateTime.ofInstant(
-                                                    Instant.ofEpochMilli(struct.getLong(OFFSET_VALUE_COMMIT_TIMESTAMP_FIELD_V3)), ZoneOffset.UTC);
+                                            if(valueByteBuffer == null) { // Tombstone
+                                                consumerOffsetRecords.remove(messageKey);
                                             } else {
-                                                logger.warn("Unsupported offset message version: {}", valueVersion);
-                                            }
+                                                short valueVersion = valueByteBuffer.getShort();
+                                                logger.debug("Value Version is " + valueVersion);
+                                                if(valueVersion == 0) {
+                                                    Struct struct = OFFSET_COMMIT_VALUE_SCHEMA_V0.read(valueByteBuffer);
 
-                                            if(consumerOffsetRecord.offset != null) {
-                                                consumerOffsetRecords.put(messageKey, consumerOffsetRecord);
+                                                    consumerOffsetRecord.offset = struct.getLong(OFFSET_VALUE_OFFSET_FIELD_V0);
+                                                    consumerOffsetRecord.metadata = struct.getString(OFFSET_VALUE_METADATA_FIELD_V0);
+                                                    consumerOffsetRecord.commitTimestamp = ZonedDateTime.ofInstant(
+                                                        Instant.ofEpochMilli(struct.getLong(OFFSET_VALUE_TIMESTAMP_FIELD_V0)), ZoneOffset.UTC);
+                                                } else if(valueVersion == 1) {
+                                                    Struct struct = OFFSET_COMMIT_VALUE_SCHEMA_V1.read(valueByteBuffer);
+
+                                                    consumerOffsetRecord.offset = struct.getLong(OFFSET_VALUE_OFFSET_FIELD_V1);
+                                                    consumerOffsetRecord.metadata = struct.getString(OFFSET_VALUE_METADATA_FIELD_V1);
+                                                    consumerOffsetRecord.commitTimestamp = ZonedDateTime.ofInstant(
+                                                        Instant.ofEpochMilli(struct.getLong(OFFSET_VALUE_COMMIT_TIMESTAMP_FIELD_V1)), ZoneOffset.UTC);
+                                                    consumerOffsetRecord.expireTimestamp = ZonedDateTime.ofInstant(
+                                                        Instant.ofEpochMilli(struct.getLong(OFFSET_VALUE_EXPIRE_TIMESTAMP_FIELD_V1)), ZoneOffset.UTC);
+                                                } else if(valueVersion == 2) {
+                                                    Struct struct = OFFSET_COMMIT_VALUE_SCHEMA_V2.read(valueByteBuffer);
+
+                                                    consumerOffsetRecord.offset = struct.getLong(OFFSET_VALUE_OFFSET_FIELD_V2);
+                                                    consumerOffsetRecord.metadata = struct.getString(OFFSET_VALUE_METADATA_FIELD_V2);
+                                                    consumerOffsetRecord.commitTimestamp = ZonedDateTime.ofInstant(
+                                                        Instant.ofEpochMilli(struct.getLong(OFFSET_VALUE_COMMIT_TIMESTAMP_FIELD_V2)), ZoneOffset.UTC);
+                                                } else if(valueVersion == 3) {
+                                                    Struct struct = OFFSET_COMMIT_VALUE_SCHEMA_V3.read(valueByteBuffer);
+
+                                                    consumerOffsetRecord.offset = struct.getLong(OFFSET_VALUE_OFFSET_FIELD_V3);
+                                                    consumerOffsetRecord.leaderEpoch = struct.getInt(OFFSET_VALUE_LEADER_EPOCH_FIELD_V3);
+                                                    consumerOffsetRecord.metadata = struct.getString(OFFSET_VALUE_METADATA_FIELD_V3);
+                                                    consumerOffsetRecord.commitTimestamp = ZonedDateTime.ofInstant(
+                                                        Instant.ofEpochMilli(struct.getLong(OFFSET_VALUE_COMMIT_TIMESTAMP_FIELD_V3)), ZoneOffset.UTC);
+                                                } else {
+                                                    logger.warn("Unsupported offset message version: {}", valueVersion);
+                                                }
+
+                                                if(consumerOffsetRecord.offset != null) {
+                                                    consumerOffsetRecords.put(messageKey, consumerOffsetRecord);
+                                                }
                                             }
+                                        } else if(keyVersion == 2) { // Group metadata
+                                            // We are not interested by the metadata
+                                        } else {
+                                            logger.debug("Unsupported group metadata message version: {}", keyVersion);
                                         }
-                                    } else if(keyVersion == 2) { // Group metadata
-                                        // We are not interested by the metadata
-                                    } else {
-                                        logger.debug("Unsupported group metadata message version: {}", keyVersion);
+                                    } catch(RuntimeException e) {
+                                        logger.error("Unexpected error while processing message from consumer offset topic: {}", e, e);
                                     }
-                                } catch (RuntimeException e) {
-                                    logger.error("Unexpected error while processing message from consumer offset topic: {}", e, e);
                                 }
+                            } catch(WakeupException | InterruptException e) {
+                                /* noop */
+                            } catch(KafkaException e) {
+                                logger.error("Unhandled kafka error: {}\nRestarting consumer...", e, e);
+                                break;
                             }
-                        } catch (WakeupException | InterruptException e) {
-                            /* noop */
-                        } catch (KafkaException e) {
-                            logger.error("Unhandled kafka error: {}\nRestarting consumer...", e, e);
-                            break;
                         }
+                    } catch(WakeupException | InterruptException e) {
+                        /* noop */
                     }
                 }
             } finally {

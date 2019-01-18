@@ -1,6 +1,5 @@
 package com.greencomnetworks.franzmanager.services;
 
-import com.greencomnetworks.franzmanager.entities.Broker;
 import com.greencomnetworks.franzmanager.resources.BrokersResource;
 import org.apache.zookeeper.ZooKeeper;
 import org.slf4j.Logger;

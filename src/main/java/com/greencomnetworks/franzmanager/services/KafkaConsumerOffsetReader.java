@@ -38,6 +38,9 @@ public class KafkaConsumerOffsetReader {
     private static final String CONSUMER_GROUP_ID = "franz-manager-api_consumer-offset-reader";
     private static final String CONSUMER_CLIENT_ID = CONSUMER_GROUP_ID + "_" + System.getenv("HOSTNAME");
 
+    private static final Duration pollTimeout = Duration.ofSeconds(1);
+    private static final Duration reconnectTimeout = Duration.ofSeconds(30);
+
     public static class GroupMetadataSchemas {
         public static Schema OFFSET_COMMIT_KEY_SCHEMA = new Schema(
             new Field("group", Type.STRING),
@@ -117,6 +120,7 @@ public class KafkaConsumerOffsetReader {
         Map<String, Object> config = new HashMap<>();
         config.put(CommonClientConfigs.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
         config.put(CommonClientConfigs.CLIENT_ID_CONFIG, CONSUMER_CLIENT_ID + "_" + clusterId);
+        config.put(CommonClientConfigs.RECONNECT_BACKOFF_MAX_MS_CONFIG, reconnectTimeout.toMillis());
         config.put(ConsumerConfig.GROUP_ID_CONFIG, CONSUMER_GROUP_ID);
         config.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, false);
         config.put(ConsumerConfig.EXCLUDE_INTERNAL_TOPICS_CONFIG, false);
@@ -141,7 +145,7 @@ public class KafkaConsumerOffsetReader {
                         consumer.seekToBeginning(topicPartitions);
                         while(running.get()) {
                             try {
-                                ConsumerRecords<ByteBuffer, ByteBuffer> records = consumer.poll(Duration.ofMillis(100));
+                                ConsumerRecords<ByteBuffer, ByteBuffer> records = consumer.poll(pollTimeout);
 
                                 for(ConsumerRecord<ByteBuffer, ByteBuffer> record : records) {
                                     ByteBuffer keyByteBuffer = record.key();
@@ -225,15 +229,21 @@ public class KafkaConsumerOffsetReader {
                                 break;
                             }
                         }
+                        if(running.get()) {
+                            try { Thread.sleep(reconnectTimeout.toMillis()); } catch(InterruptedException e) { /* noop */ }
+                        }
                     } catch(WakeupException | InterruptException e) {
                         /* noop */
                     }
                 }
+            } catch(Throwable e) {
+                logger.error("Unexpected error: {}", e, e);
             } finally {
                 consumer.close();
             }
         }, "ConsumerOffsetReader-" + clusterId);
 
+        thread.setDaemon(true);
         thread.start();
 
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {

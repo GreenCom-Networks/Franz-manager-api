@@ -60,7 +60,7 @@ public class MetricsResource {
         }
 
         ObjectName objName = new ObjectName(queryString);
-        ArrayList<Broker> knownKafkaBrokers = BrokersService.getKnownKafkaBrokers(clusterId);
+        List<Broker> knownKafkaBrokers = BrokersService.getKnownKafkaBrokers(clusterId);
         List<Metric> metrics = new ArrayList<>();
         for (String brokerHost : jmxConnectors.keySet()) {
             try {

@@ -2,7 +2,6 @@ package com.greencomnetworks.franzmanager.services;
 
 import com.greencomnetworks.franzmanager.entities.ConsumerOffsetRecord;
 import com.greencomnetworks.franzmanager.utils.KafkaUtils;
-import org.apache.commons.lang3.RandomUtils;
 import org.apache.kafka.clients.CommonClientConfigs;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.ConsumerRecord;

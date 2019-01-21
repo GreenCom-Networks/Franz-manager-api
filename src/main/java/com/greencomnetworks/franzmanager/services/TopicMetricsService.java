@@ -13,8 +13,8 @@ import org.slf4j.LoggerFactory;
 import javax.management.*;
 import javax.management.remote.JMXConnector;
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ExecutionException;
 
@@ -50,7 +50,7 @@ public class TopicMetricsService {
                         Set<String> topics = adminClient.listTopics(listTopicsOptions).names().get();
 
 
-                        ArrayList<Broker> knownBrokers = BrokersService.getKnownKafkaBrokers(clusterId);
+                        List<Broker> knownBrokers = BrokersService.getKnownKafkaBrokers(clusterId);
                         HashMap<String, HashMap<String, Metric>> clusterTopicsMetrics = new HashMap<>();
 
                         topics.forEach(topic -> {

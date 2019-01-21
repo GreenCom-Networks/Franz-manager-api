@@ -23,7 +23,10 @@ import javax.management.ObjectName;
 import javax.management.remote.JMXConnector;
 import javax.ws.rs.*;
 import javax.ws.rs.core.MediaType;
-import java.util.*;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ExecutionException;
 
 @Path("/brokers")
@@ -120,7 +123,7 @@ public class BrokersResource {
     public List<Broker> getBrokers(@QueryParam("withConfiguration") boolean withConfiguration) {
         logger.info("With configuration " + withConfiguration);
 
-        ArrayList<Broker> knownBrokers = BrokersService.getKnownKafkaBrokers(clusterId);
+        List<Broker> knownBrokers = BrokersService.getKnownKafkaBrokers(clusterId);
 
         if (withConfiguration) {
             knownBrokers.forEach(broker -> { // if broker is okay, admin client should work.

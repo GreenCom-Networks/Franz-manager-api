@@ -1,5 +1,7 @@
 ### Franz-manager-api
 
+Discover more on the fancy [franz-manager.io](https://www.franz-manager.io/) !
+
 This api should work with the front-end franz-manager --> [github](https://github.com/GreenCom-Networks/Franz-manager), [dockerhub](https://hub.docker.com/r/greencomnetworks/franz-manager)
 
 ### Environment variables

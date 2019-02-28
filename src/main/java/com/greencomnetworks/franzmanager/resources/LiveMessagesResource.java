@@ -18,9 +18,9 @@ import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.errors.WakeupException;
 import org.apache.kafka.common.serialization.Deserializer;
 import org.apache.kafka.common.serialization.Serdes;
-import org.glassfish.grizzly.websockets.DataFrame;
-import org.glassfish.grizzly.websockets.WebSocket;
-import org.glassfish.grizzly.websockets.WebSocketApplication;
+import org.glassfish.grizzly.http.HttpRequestPacket;
+import org.glassfish.grizzly.http.util.MimeHeaders;
+import org.glassfish.grizzly.websockets.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -33,16 +33,34 @@ public class LiveMessagesResource extends WebSocketApplication {
 
     private Map<WebSocket, FranzConsumer> franzConsumers = new HashMap<>();
 
-    private static LiveMessagesResource instance = new LiveMessagesResource();
+    private static class WS extends DefaultWebSocket {
+        public final String remoteAddress;
+        public final String origin;
 
-    public static LiveMessagesResource getInstance() {
-        return instance;
+        public WS(ProtocolHandler protocolHandler, HttpRequestPacket request, WebSocketListener... listeners) {
+            super(protocolHandler, request, listeners);
+
+            String forwardedFor = request.getHeader("x-forwarded-for");
+            String origin = request.getHeader("origin");
+            this.remoteAddress = forwardedFor != null ? forwardedFor : request.getRemoteAddress();
+            this.origin = origin != null ? origin : "";
+        }
+
+        @Override
+        public String toString() {
+            return String.format("%s|%s", remoteAddress, origin);
+        }
+    }
+
+    @Override
+    public WebSocket createSocket(ProtocolHandler handler, HttpRequestPacket requestPacket, WebSocketListener... listeners) {
+        return new WS(handler, requestPacket, listeners);
     }
 
     @Override
     public void onMessage(WebSocket socket, String data) {
         if(StringUtils.isEmpty(data)) {
-            logger.warn("Received empty message");
+            logger.warn("Received empty message from '{}'", socket);
             return;
         }
 
@@ -52,7 +70,7 @@ public class LiveMessagesResource extends WebSocketApplication {
         switch (action) {
             case "subscribe":
                 if(actions.length < 3) {
-                    logger.warn("Invalid subscribe action: '{}'", data);
+                    logger.warn("Invalid subscribe action from '{}': '{}'", socket, data);
                     return;
                 }
                 this.newSocketConsumer(socket, actions[1], actions[2]);
@@ -61,14 +79,14 @@ public class LiveMessagesResource extends WebSocketApplication {
                 socket.close();
                 break;
             default:
-                logger.warn("Unknown socket action : " + action);
+                logger.warn("Unknown socket action from '{}': '{}'", socket, action);
                 break;
         }
     }
 
     @Override
     public void onConnect(WebSocket socket) {
-        logger.info("new websocket connection");
+        logger.info("New websocket connection: '{}'", socket);
     }
 
     @Override
@@ -77,13 +95,15 @@ public class LiveMessagesResource extends WebSocketApplication {
         if(franzConsumer != null) {
             franzConsumer.shutdown();
             franzConsumers.remove(socket);
-            logger.info("websocket closed, consumer " + franzConsumer.id + " closed.");
+            logger.info("Websocket '{}' closed, consumer {} closed.", socket, franzConsumer.id);
         } else {
-            logger.info("websocket closed");
+            logger.info("Websocket '{}' closed.", socket);
         }
     }
 
     private void newSocketConsumer(WebSocket socket, String topic, String clusterId) {
+        logger.info("New subscription from '{}': Cluster:'{}' - Topic:'{}'", socket, clusterId, topic);
+
         AdminClient adminClient = AdminClientService.getAdminClient(clusterId);
         if(KafkaUtils.describeTopic(adminClient, topic) == null) {
             logger.warn("Trying to subscribe to an unknown topic: '{}' on '{}'", topic, clusterId);
@@ -91,6 +111,14 @@ public class LiveMessagesResource extends WebSocketApplication {
             return;
         }
 
+        // Close previous subscription if there was one.
+        {
+            FranzConsumer c = franzConsumers.get(socket);
+            if(c != null) {
+                logger.warn("Multiple subscription on same ws '{}'. Closing consumer {}.", socket, c.id);
+                c.shutdown();
+            }
+        }
         FranzConsumer franzConsumer = new FranzConsumer("franz-manager-api_live", topic, socket, clusterId);
         franzConsumers.put(socket, franzConsumer);
         franzConsumer.start();
@@ -100,18 +128,20 @@ public class LiveMessagesResource extends WebSocketApplication {
 
         private final KafkaConsumer<String, String> consumer;
         private final String id;
-        private final String groupId;
+        private final String clientId;
         private final String topic;
         private final WebSocket socket;
 
         private final Thread thread;
 
-        private FranzConsumer(String groupId,
+        // TODO: Keep track of how many messages got read.
+
+        private FranzConsumer(String clientId,
                               String topic,
                               WebSocket socket,
                               String clusterId) {
             this.id = UUID.randomUUID().toString();
-            this.groupId = groupId + '_' + id;
+            this.clientId = clientId + '_' + id;
             this.topic = topic;
             this.socket = socket;
             Cluster cluster = null;
@@ -128,8 +158,8 @@ public class LiveMessagesResource extends WebSocketApplication {
             final Properties props = new Properties();
             props.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, cluster.brokersConnectString);
             props.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, false);
-            props.put(ConsumerConfig.GROUP_ID_CONFIG, this.groupId);
-            props.put(ConsumerConfig.CLIENT_ID_CONFIG, this.groupId);
+            props.put(ConsumerConfig.CLIENT_ID_CONFIG, this.clientId);
+            props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "latest");
             Deserializer<String> deserializer = Serdes.String().deserializer();
             this.consumer = new KafkaConsumer<>(props, deserializer, deserializer);
 
@@ -142,7 +172,7 @@ public class LiveMessagesResource extends WebSocketApplication {
                 ObjectMapper objectMapper = CustomObjectMapper.defaultInstance();
                 List<TopicPartition> topicPartitions = KafkaUtils.topicPartitionsOf(consumer, this.topic);
                 consumer.assign(topicPartitions);
-                consumer.seekToEnd(topicPartitions);
+                //consumer.seekToEnd(topicPartitions);
 
                 while (true) {
                     ConsumerRecords<String, String> records = consumer.poll(Duration.ofMillis(1000));
@@ -152,7 +182,7 @@ public class LiveMessagesResource extends WebSocketApplication {
                         messages.add(message);
                     }
                     if (messages.size() > 0) {
-                        logger.info("{}: consumed {} message(s)", this.id, String.valueOf(messages.size()));
+                        logger.trace("{}: consumed {} message(s)", this.id, messages.size());
                         try {
                             String s = objectMapper.writeValueAsString(messages);
                             this.socket.send(s);

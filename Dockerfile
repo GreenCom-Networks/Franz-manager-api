@@ -16,4 +16,7 @@ COPY apidoc apidoc
 
 COPY --from=builder /app/target/$APP-jar-with-dependencies.jar $APP.jar
 
-CMD java -Xmx${JVM_HEAP_SIZE:-1024}m -XX:+ExitOnOutOfMemoryError -jar $APP.jar
+CMD java \
+    -Xmx${JVM_HEAP_SIZE:-1024}m \
+    -XX:+ExitOnOutOfMemoryError \
+    -jar $APP.jar

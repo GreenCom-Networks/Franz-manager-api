@@ -82,13 +82,13 @@ public class CustomLogger implements ApplicationEventListener {
                 if(query != null) requestedFile = path + "?" + query;
 
                 if(body == null) {
-                    logger.info("{} | {} {} - {}  [{} ms]\n{}",
-                        callId, method, requestedFile, status, requestDuration.toMillis(), callId
+                    logger.info("{}| {} {} - {}  [{} ms]",
+                        callId, method, requestedFile, status, requestDuration.toMillis()
                     );
                 } else {
-                    logger.info("{} | {} {} - {}  [{} ms]\n{}",
+                    logger.info("{}| {} {} - {}  [{} ms]\n{}| \"{}\"",
                         callId, method, requestedFile, status, requestDuration.toMillis(),
-                        callId, callId, StringEscapeUtils.escapeJava(body)
+                        callId, StringEscapeUtils.escapeJava(body)
                     );
                 }
 

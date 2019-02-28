@@ -7,7 +7,6 @@ import org.apache.kafka.clients.admin.AdminClient;
 import org.apache.kafka.clients.admin.AdminClientConfig;
 import org.apache.kafka.clients.admin.KafkaAdminClient;
 
-import javax.validation.constraints.Null;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;

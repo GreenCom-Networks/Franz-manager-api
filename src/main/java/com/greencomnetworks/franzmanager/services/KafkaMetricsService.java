@@ -1,11 +1,9 @@
 package com.greencomnetworks.franzmanager.services;
 
 import com.greencomnetworks.franzmanager.entities.Cluster;
-import org.apache.kafka.clients.admin.AdminClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.management.*;
 import javax.management.remote.JMXConnector;
 import javax.management.remote.JMXConnectorFactory;
 import javax.management.remote.JMXServiceURL;
@@ -44,7 +42,6 @@ public class KafkaMetricsService {
                             try {
                                 mbscs.get(url).getMBeanServerConnection();
                             } catch (IOException | NullPointerException e) {
-                                logger.info("Connecting to jmx -- url: " + url.split(":")[0] + " -- cluster: " + cluster.name);
                                 connectJmx(cluster, url);
                             }
                         }
@@ -58,6 +55,7 @@ public class KafkaMetricsService {
 
         private static void connectJmx(Cluster cluster, String url) {
             try {
+                logger.info("Connecting to jmx -- url: " + url.split(":")[0] + " -- cluster: " + cluster.name);
                 JMXServiceURL jmxUrl = new JMXServiceURL("service:jmx:rmi:///jndi/rmi://" + url + "/jmxrmi");
                 JMXConnector jmxc = JMXConnectorFactory.connect(jmxUrl, null);
                 jmxConnector.get(cluster.name).put(url, jmxc);

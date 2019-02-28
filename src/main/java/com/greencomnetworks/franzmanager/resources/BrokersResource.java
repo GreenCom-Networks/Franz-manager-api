@@ -2,21 +2,31 @@ package com.greencomnetworks.franzmanager.resources;
 
 import com.greencomnetworks.franzmanager.entities.Broker;
 import com.greencomnetworks.franzmanager.entities.Cluster;
-import com.greencomnetworks.franzmanager.services.*;
+import com.greencomnetworks.franzmanager.services.AdminClientService;
+import com.greencomnetworks.franzmanager.services.BrokersService;
+import com.greencomnetworks.franzmanager.services.ConstantsService;
+import com.greencomnetworks.franzmanager.services.KafkaMetricsService;
 import com.greencomnetworks.franzmanager.utils.FUtils;
 import com.greencomnetworks.franzmanager.utils.KafkaUtils;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.kafka.clients.admin.*;
+import org.apache.kafka.clients.admin.AdminClient;
+import org.apache.kafka.clients.admin.Config;
+import org.apache.kafka.clients.admin.ConfigEntry;
+import org.apache.kafka.clients.admin.DescribeConfigsOptions;
 import org.apache.kafka.common.Node;
 import org.apache.kafka.common.config.ConfigResource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.management.*;
+import javax.management.MBeanServerConnection;
+import javax.management.ObjectName;
 import javax.management.remote.JMXConnector;
 import javax.ws.rs.*;
 import javax.ws.rs.core.MediaType;
-import java.util.*;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ExecutionException;
 
 @Path("/brokers")
@@ -113,7 +123,7 @@ public class BrokersResource {
     public List<Broker> getBrokers(@QueryParam("withConfiguration") boolean withConfiguration) {
         logger.info("With configuration " + withConfiguration);
 
-        ArrayList<Broker> knownBrokers = BrokersService.getKnownKafkaBrokers(clusterId);
+        List<Broker> knownBrokers = BrokersService.getKnownKafkaBrokers(clusterId);
 
         if (withConfiguration) {
             knownBrokers.forEach(broker -> { // if broker is okay, admin client should work.

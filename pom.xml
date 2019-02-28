@@ -10,17 +10,25 @@
 
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <maven.compiler.source>1.8</maven.compiler.source>
-        <maven.compiler.target>1.8</maven.compiler.target>
         <jar.finalName>${project.artifactId}</jar.finalName>
 
         <main.class>com.greencomnetworks.franzmanager.FranzManagerApi</main.class>
 
-        <log4j.version>2.11.1</log4j.version>
+
+        <commons.lang3.version>3.8.1</commons.lang3.version>
+        <commons.collections4.version>4.3</commons.collections4.version>
+        <commons.text.version>1.6</commons.text.version>
+        <commons.configuration2.version>2.4</commons.configuration2.version>
+        <commons.beanutils.version>1.9.3</commons.beanutils.version>
+
+        <log4j.version>2.11.2</log4j.version>
         <slf4j.version>1.7.25</slf4j.version>
-        <jersey.version>2.27</jersey.version>
+
+        <jersey.version>2.28</jersey.version>
+        <grizzly.version>2.4.4</grizzly.version>
         <jackson.version>2.9.8</jackson.version>
-        <kafka.version>2.1.0</kafka.version>
+        <kafka.version>2.1.1</kafka.version>
+        <zookeeper.version>3.4.13</zookeeper.version>
     </properties>
 
 
@@ -29,27 +37,27 @@
         <dependency>
             <groupId>org.apache.commons</groupId>
             <artifactId>commons-lang3</artifactId>
-            <version>3.8.1</version>
+            <version>${commons.lang3.version}</version>
         </dependency>
         <dependency>
             <groupId>org.apache.commons</groupId>
             <artifactId>commons-collections4</artifactId>
-            <version>4.2</version>
+            <version>${commons.collections4.version}</version>
         </dependency>
         <dependency>
             <groupId>org.apache.commons</groupId>
             <artifactId>commons-text</artifactId>
-            <version>1.6</version>
+            <version>${commons.text.version}</version>
         </dependency>
         <dependency>
             <groupId>org.apache.commons</groupId>
             <artifactId>commons-configuration2</artifactId>
-            <version>2.4</version>
+            <version>${commons.configuration2.version}</version>
         </dependency>
         <dependency>
             <groupId>commons-beanutils</groupId>
             <artifactId>commons-beanutils</artifactId>
-            <version>1.9.3</version>
+            <version>${commons.beanutils.version}</version>
         </dependency>
 
         <!-- Logger -->
@@ -105,7 +113,7 @@
         <dependency>
             <groupId>org.glassfish.grizzly</groupId>
             <artifactId>grizzly-websockets-server</artifactId>
-            <version>2.4.3.1</version>
+            <version>${grizzly.version}</version>
         </dependency>
 
         <!-- Jackson -->
@@ -146,7 +154,17 @@
         <dependency>
             <groupId>org.apache.zookeeper</groupId>
             <artifactId>zookeeper</artifactId>
-            <version>3.4.13</version>
+            <version>${zookeeper.version}</version>
+            <exclusions>
+                <exclusion>
+                    <groupId>org.slf4j</groupId>
+                    <artifactId>slf4j-log4j12</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>log4j</groupId>
+                    <artifactId>log4j</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
     </dependencies>
 
@@ -161,8 +179,17 @@
 
         <plugins>
             <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <version>3.8.0</version>
+                <configuration>
+                    <release>8</release>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-assembly-plugin</artifactId>
-                <version>3.1.0</version>
+                <version>3.1.1</version>
                 <configuration>
                     <descriptorRefs>
                         <descriptorRef>jar-with-dependencies</descriptorRef>

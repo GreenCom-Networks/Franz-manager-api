@@ -7,21 +7,16 @@ import com.greencomnetworks.franzmanager.utils.FUtils;
 import org.apache.commons.lang3.math.NumberUtils;
 import org.apache.kafka.clients.admin.AdminClient;
 import org.apache.kafka.clients.admin.ListTopicsOptions;
-import org.apache.kafka.common.Node;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.management.*;
 import javax.management.remote.JMXConnector;
 import java.io.IOException;
-import java.net.InetAddress;
-import java.net.UnknownHostException;
-import java.util.ArrayList;
-import java.util.Collection;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ExecutionException;
-import java.util.stream.Collectors;
 
 public class TopicMetricsService {
     private static final Logger logger = LoggerFactory.getLogger(BrokersResource.class);
@@ -55,7 +50,7 @@ public class TopicMetricsService {
                         Set<String> topics = adminClient.listTopics(listTopicsOptions).names().get();
 
 
-                        ArrayList<Broker> knownBrokers = BrokersService.getKnownKafkaBrokers(clusterId);
+                        List<Broker> knownBrokers = BrokersService.getKnownKafkaBrokers(clusterId);
                         HashMap<String, HashMap<String, Metric>> clusterTopicsMetrics = new HashMap<>();
 
                         topics.forEach(topic -> {

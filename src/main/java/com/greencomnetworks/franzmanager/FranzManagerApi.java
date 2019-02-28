@@ -73,16 +73,16 @@ public class FranzManagerApi {
         }, HttpHandlerRegistration.builder().contextPath(apiConfig.basePath + "/apidoc").urlPattern("/").build());
 
         ConstantsService.init();
+        ZookeeperService.init();
         KafkaConsumerOffsetReader.init();
         KafkaMetricsService.init();
         TopicMetricsService.init();
-        ZookeeperService.init();
         BrokersService.init();
 
         // Set Worker Pool Size
         for (NetworkListener listener : server.getListeners()) {
-            listener.getTransport().getWorkerThreadPoolConfig().setMaxPoolSize(apiConfig.listenerWorkersCount);
-            listener.getTransport().getWorkerThreadPoolConfig().setCorePoolSize(apiConfig.listenerWorkersCount);
+            listener.getTransport().getWorkerThreadPoolConfig().setCorePoolSize(apiConfig.listenerWorkersSizeCore);
+            listener.getTransport().getWorkerThreadPoolConfig().setMaxPoolSize(apiConfig.listenerWorkersSizeMax);
         }
 
         server.start();

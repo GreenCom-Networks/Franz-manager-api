@@ -96,8 +96,8 @@ public class CustomExceptionMapper implements ExceptionMapper<Exception> {
             this.code = code;
             this.message = message;
 
-            // Print stack on env = LOCAL|DEV && code = 5xx
-            if (code >= 500 && code < 600 && StringUtils.equalsAny(System.getenv("ENV"), "LOCAL", "DEV")) {
+            // Print stack on code = 5xx
+            if (code >= 500 && code < 600) {
                 this.stack = Arrays.stream(stack).map(StackTraceElement::toString).collect(Collectors.toList());
             } else {
                 this.stack = null;

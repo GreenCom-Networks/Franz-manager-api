@@ -56,69 +56,6 @@ public class BrokersResource {
         }
     }
 
-    /*
-        @GET
-        public List<Broker> getBrokers() {
-            try {
-                String hostName = InetAddress.getLocalHost().getHostName();
-                Cluster cluster = ConstantsService.clusters.stream().filter(c -> c.name.equals(clusterId)).findAny().orElse(null);
-                Collection<Node> brokers;
-                try {
-                    brokers = adminClient.describeCluster(new DescribeClusterOptions().timeoutMs(2000)).nodes().get().stream().map(broker -> {
-                        if (broker.host().equals(hostName)) {
-                            return new Node(broker.id(), "127.0.0.1", broker.port(), broker.rack());
-                        }
-                        return broker;
-                    }).collect(Collectors.toList());
-                } catch (Exception e) {
-                    return Arrays.stream(this.cluster.brokersConnectString.split(",")).map(connectString -> {
-                        return new Broker("?", connectString.split(":")[0], Integer.parseInt(connectString.split(":")[1]), null, (float) 0, (float) 0, Broker.State.UNSTABLE);
-                    }).collect(Collectors.toList());
-                }
-                Collection<ConfigResource> configResources = brokers.stream().map(broker -> new ConfigResource(ConfigResource.Type.BROKER, broker.idString())).collect(Collectors.toSet());
-                Map<ConfigResource, Config> brokersConfigs = adminClient.describeConfigs(configResources).all().get();
-
-                List<Broker> brokerList = FUtils.getOrElse(brokers.stream().map(broker -> {
-                    ConfigResource configResource = new ConfigResource(ConfigResource.Type.BROKER, broker.idString());
-                    Config config = brokersConfigs.get(configResource);
-
-                    Map<String, String> configs = new HashMap<>();
-                    for (ConfigEntry entry : config.entries()) {
-                        configs.put(entry.name(), entry.value());
-                    }
-
-                    Float bytesIn = null;
-                    Float bytesOut = null;
-                    Broker.State brokerState = Broker.State.OK;
-                    try {
-                        MBeanServerConnection mbsc = jmxConnector.get(broker.host()).getMBeanServerConnection();
-                        logger.info("WTF :: " + broker.host());
-                        logger.info("WTF :: " + mbsc.toString());
-                        bytesIn = Float.valueOf(mbsc.getAttribute(new ObjectName("kafka.server:type=BrokerTopicMetrics,name=BytesInPerSec"), "OneMinuteRate").toString());
-                        bytesOut = Float.valueOf(mbsc.getAttribute(new ObjectName("kafka.server:type=BrokerTopicMetrics,name=BytesOutPerSec"), "OneMinuteRate").toString());
-                    } catch (Exception e) {
-                        logger.error("Error while retrieving JMX data: {}", e.getMessage(), e);
-                        brokerState = Broker.State.BROKEN;
-                    }
-                    return new Broker(broker.idString(), broker.host(), broker.port(), configs, bytesIn, bytesOut, brokerState);
-                }).collect(Collectors.toList()), new ArrayList<>());
-
-                Collection<Node> finalBrokers = brokers;
-                Arrays.stream(cluster.brokersConnectString.split(",")).forEach(brokerString -> {
-                    Node existingNode = finalBrokers.stream().filter(b -> b.host().equals(brokerString.split(":")[0])).findAny().orElse(null);
-                    if (existingNode == null) {
-                        brokerList.add(new Broker("?", brokerString.split(":")[0], Integer.parseInt(brokerString.split(":")[1]), null, (float) 0, (float) 0, Broker.State.BROKEN));
-                    }
-                });
-
-                return brokerList;
-            } catch (InterruptedException e) {
-                throw new RuntimeException(e);
-            } catch (ExecutionException | UnknownHostException e) {
-                throw new RuntimeException(e.getCause());
-            }
-        }
-    */
     @GET
     public List<Broker> getBrokers(@QueryParam("withConfiguration") boolean withConfiguration) {
         logger.info("With configuration " + withConfiguration);
@@ -187,7 +124,7 @@ public class BrokersResource {
 
                 return new Broker(node.idString(), node.host(), node.port(), -1, configs, Broker.State.OK);
             } catch (Exception e) {
-                logger.info("ERRORRRR: " + e.getMessage());
+                logger.info("ERROR: " + e.getMessage());
                 return null;
             }
         } catch (InterruptedException e) {

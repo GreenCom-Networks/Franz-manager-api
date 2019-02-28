@@ -1,4 +1,4 @@
-FROM maven AS builder
+FROM maven:3-jdk-11-slim AS builder
 
 COPY . /app/.
 
@@ -6,15 +6,13 @@ WORKDIR /app
 
 RUN mvn clean package
 
-FROM openjdk:8-jdk-alpine
+FROM openjdk:8-jdk-slim
 
 ENV APP franz-manager-api
 
 WORKDIR /usr/local/$APP
 
 COPY apidoc apidoc
-
-RUN apk update && apk add --no-cache libc6-compat
 
 COPY --from=builder /app/target/$APP-jar-with-dependencies.jar $APP.jar
 

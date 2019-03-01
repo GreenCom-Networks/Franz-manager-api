@@ -5,10 +5,10 @@ import org.apache.kafka.common.TopicPartitionInfo;
 
 public class Partition {
     private String topic;
-    private Integer partition;
+    private int partition;
     private long beginningOffset;
     private long endOffset;
-    private Integer leader;
+    private int leader;
     private int[] replicas;
     private int[] inSyncReplicas;
     private int[] offlineReplicas;

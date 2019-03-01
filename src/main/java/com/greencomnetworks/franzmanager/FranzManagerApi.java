@@ -111,12 +111,13 @@ public class FranzManagerApi {
         try {
             FranzManagerApi api = new FranzManagerApi();
 
-            ConstantsService.init();
+            ClustersService.init();
+            AdminClientService.init();
             ZookeeperService.init();
+            BrokersService.init();
             KafkaConsumerOffsetReader.init();
             KafkaMetricsService.init();
             TopicMetricsService.init();
-            BrokersService.init();
 
             api.start();
         } catch (Throwable e) {

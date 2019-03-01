@@ -1,5 +1,6 @@
 package com.greencomnetworks.franzmanager.services;
 
+import com.greencomnetworks.franzmanager.entities.Cluster;
 import com.greencomnetworks.franzmanager.entities.ConsumerOffsetRecord;
 import com.greencomnetworks.franzmanager.utils.KafkaUtils;
 import org.apache.kafka.clients.CommonClientConfigs;
@@ -109,7 +110,7 @@ public class KafkaConsumerOffsetReader {
     }
 
     private KafkaConsumerOffsetReader() {
-        ConstantsService.clusters.forEach(cluster -> {
+        ClustersService.clusters.forEach(cluster -> {
             startConsumer(cluster.name, cluster.brokersConnectString);
         });
     }
@@ -254,8 +255,8 @@ public class KafkaConsumerOffsetReader {
     }
 
 
-    public Collection<ConsumerOffsetRecord> getConsumerOffsetRecords(String clusterId) {
-        return this.consumerOffsetRecordArray.get(clusterId).values();
+    public Collection<ConsumerOffsetRecord> getConsumerOffsetRecords(Cluster cluster) {
+        return this.consumerOffsetRecordArray.get(cluster.name).values();
     }
 }
 

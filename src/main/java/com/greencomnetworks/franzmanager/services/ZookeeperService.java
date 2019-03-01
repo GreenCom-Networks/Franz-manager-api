@@ -20,7 +20,7 @@ public class ZookeeperService {
     private static final Duration zookeeperTimeout = Duration.ofMillis(15000);
 
     public static void init() {
-        for(Cluster cluster : ConstantsService.clusters) {
+        for(Cluster cluster : ClustersService.clusters) {
             registerZookeeperClient(cluster);
         }
     }
@@ -34,8 +34,8 @@ public class ZookeeperService {
         }
     }
 
-    public static ZooKeeper getZookeeperConnection(String clusterId) {
-        return zookeeperConnections.get(clusterId);
+    public static ZooKeeper getZookeeperConnection(Cluster cluster) {
+        return zookeeperConnections.get(cluster.name);
     }
 
     private static class ZookeeperWrapper implements Watcher {

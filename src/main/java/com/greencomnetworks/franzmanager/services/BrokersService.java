@@ -25,14 +25,14 @@ public class BrokersService {
     private static final Duration discoveryPeriod = Duration.ofSeconds(30);
 
     public static void init() {
-        for(Cluster cluster : ConstantsService.clusters) {
+        for(Cluster cluster : ClustersService.clusters) {
             KafkaBrokersDiscovery discovery = new KafkaBrokersDiscovery(cluster);
             discovery.start();
         }
     }
 
-    public static List<Broker> getKnownKafkaBrokers(String clusterId) {
-        return brokersByCluster.getOrDefault(clusterId, new ArrayList<>(0));
+    public static List<Broker> getKnownKafkaBrokers(Cluster cluster) {
+        return brokersByCluster.getOrDefault(cluster.name, new ArrayList<>(0));
     }
 
     private static class KafkaBrokersDiscovery implements Runnable {
@@ -63,7 +63,7 @@ public class BrokersService {
                 while(running.get()) {
                     try {
                         while(running.get()) {
-                            List<Broker> previouslyKnownBrokers = getKnownKafkaBrokers(cluster.name);
+                            List<Broker> previouslyKnownBrokers = getKnownKafkaBrokers(cluster);
                             List<Broker> brokers = scanBrokers(previouslyKnownBrokers);
                             brokersByCluster.put(cluster.name, brokers);
 
@@ -79,10 +79,10 @@ public class BrokersService {
         }
 
         private List<Broker> scanBrokers(List<Broker> previouslyKnownBrokers) {
-            List<Broker> brokers = previouslyKnownBrokers != null ? new ArrayList<>(previouslyKnownBrokers.size()) : new ArrayList<>();
+            List<Broker> brokers = new ArrayList<>(previouslyKnownBrokers.size());
 
             try {
-                ZooKeeper zooKeeper = ZookeeperService.getZookeeperConnection(cluster.name);
+                ZooKeeper zooKeeper = ZookeeperService.getZookeeperConnection(cluster);
                 if (zooKeeper == null) throw new IllegalStateException("Unable to obtain zookeeper connection for cluster \"" + cluster.name + "\"");
 
                 List<String> brokerIds = zooKeeper.getChildren("/brokers/ids", false);

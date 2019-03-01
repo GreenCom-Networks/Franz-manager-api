@@ -1,15 +1,12 @@
 package com.greencomnetworks.franzmanager.resources;
 
 import com.greencomnetworks.franzmanager.entities.Broker;
+import com.greencomnetworks.franzmanager.entities.Cluster;
 import com.greencomnetworks.franzmanager.entities.Metric;
-import com.greencomnetworks.franzmanager.services.AdminClientService;
-import com.greencomnetworks.franzmanager.services.BrokersService;
-import com.greencomnetworks.franzmanager.services.KafkaMetricsService;
-import com.greencomnetworks.franzmanager.services.TopicMetricsService;
+import com.greencomnetworks.franzmanager.services.*;
 import com.greencomnetworks.franzmanager.utils.FUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.math.NumberUtils;
-import org.apache.kafka.clients.admin.AdminClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -28,14 +25,13 @@ import java.util.concurrent.ExecutionException;
 public class MetricsResource {
     private static final Logger logger = LoggerFactory.getLogger(MetricsResource.class);
 
-    private HashMap<String, JMXConnector> jmxConnectors;
-    private AdminClient adminClient;
-    private String clusterId;
+    private Cluster cluster;
 
     public MetricsResource(@HeaderParam("clusterId") String clusterId) {
-        this.jmxConnectors = KafkaMetricsService.getJmxConnector(clusterId);
-        this.adminClient = AdminClientService.getAdminClient(clusterId);
-        this.clusterId = clusterId;
+        this.cluster = ClustersService.getCluster(clusterId);
+        if(this.cluster == null){
+            throw new NotFoundException("Cluster not found for id " + clusterId);
+        }
     }
 
     @GET
@@ -60,13 +56,14 @@ public class MetricsResource {
         }
 
         ObjectName objName = new ObjectName(queryString);
-        List<Broker> knownKafkaBrokers = BrokersService.getKnownKafkaBrokers(clusterId);
+        List<Broker> knownKafkaBrokers = BrokersService.getKnownKafkaBrokers(cluster);
         List<Metric> metrics = new ArrayList<>();
+        HashMap<String, JMXConnector> jmxConnectors = new HashMap<>(KafkaMetricsService.getJmxConnectors(cluster));
         for (String brokerHost : jmxConnectors.keySet()) {
             try {
                 MBeanServerConnection mbsc = jmxConnectors.get(brokerHost).getMBeanServerConnection();
                 String host = brokerHost.split(":")[0];
-                Integer port = Integer.parseInt(brokerHost.split(":")[1]);
+                int port = Integer.parseInt(brokerHost.split(":")[1]);
                 logger.warn(host + " , " + port);
                 Broker currentBroker = FUtils.findInCollection(knownKafkaBrokers, b -> b.jmxPort.equals(port) && b.host.equals(host));
                 Metric metric = new Metric(metricType, metricName, Integer.parseInt(currentBroker.id), new HashMap<>());
@@ -105,6 +102,6 @@ public class MetricsResource {
     @Path("/topics")
     @GET
     public HashMap<String, HashMap<String, Metric>> getTopicsMetric() {
-        return TopicMetricsService.getTopicsMetrics(clusterId);
+        return TopicMetricsService.getTopicsMetrics(cluster);
     }
 }

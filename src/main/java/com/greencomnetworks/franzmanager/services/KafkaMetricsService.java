@@ -13,32 +13,31 @@ import java.util.HashMap;
 
 public class KafkaMetricsService {
     private static final Logger logger = LoggerFactory.getLogger(KafkaMetricsService.class);
-    private static HashMap<String, HashMap<String, JMXConnector>> jmxConnector = new HashMap<>();
+    private static HashMap<String, HashMap<String, JMXConnector>> jmxConnectors = new HashMap<>();
 
     public static void init() {
         logger.info("Starting jmx connectivity check loop");
-        new Thread(new JmxConnectivityCheck(), "JmxConnectivityCheck").start();
+        Thread thread = new Thread(new JmxConnectivityCheck(), "JmxConnectivityCheck");
+        thread.setDaemon(true);
+        thread.start();
     }
 
-    public static HashMap<String, JMXConnector> getJmxConnector(String clusterId) {
-        if (clusterId == null) {
-            clusterId = "Default";
-        }
-        return jmxConnector.get(clusterId);
+    public static HashMap<String, JMXConnector> getJmxConnectors(Cluster cluster) {
+        return jmxConnectors.get(cluster.name);
     }
 
     public static HashMap<String, HashMap<String, JMXConnector>> getJmxConnectors() {
-        return jmxConnector;
+        return jmxConnectors;
     }
 
     private static class JmxConnectivityCheck implements Runnable {
         public void run() {
             while (true) {
                 try {
-                    ConstantsService.clusters.forEach(cluster -> {
-                        jmxConnector.computeIfAbsent(cluster.name, k -> new HashMap<>());
+                    ClustersService.clusters.forEach(cluster -> {
+                        jmxConnectors.computeIfAbsent(cluster.name, k -> new HashMap<>());
                         for (String url : cluster.jmxConnectString.split(",")) {
-                            HashMap<String, JMXConnector> mbscs = jmxConnector.get(cluster.name);
+                            HashMap<String, JMXConnector> mbscs = jmxConnectors.get(cluster.name);
                             try {
                                 mbscs.get(url).getMBeanServerConnection();
                             } catch (IOException | NullPointerException e) {
@@ -58,7 +57,7 @@ public class KafkaMetricsService {
                 logger.info("Connecting to jmx -- url: " + url.split(":")[0] + " -- cluster: " + cluster.name);
                 JMXServiceURL jmxUrl = new JMXServiceURL("service:jmx:rmi:///jndi/rmi://" + url + "/jmxrmi");
                 JMXConnector jmxc = JMXConnectorFactory.connect(jmxUrl, null);
-                jmxConnector.get(cluster.name).put(url, jmxc);
+                jmxConnectors.get(cluster.name).put(url, jmxc);
                 logger.info("__ connected " + url + " -- " + cluster.name);
             } catch (MalformedURLException e) {
                 throw new RuntimeException("The following url has a bad format : " + url, e);

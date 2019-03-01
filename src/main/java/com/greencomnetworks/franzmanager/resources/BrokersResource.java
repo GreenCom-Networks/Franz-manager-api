@@ -4,11 +4,10 @@ import com.greencomnetworks.franzmanager.entities.Broker;
 import com.greencomnetworks.franzmanager.entities.Cluster;
 import com.greencomnetworks.franzmanager.services.AdminClientService;
 import com.greencomnetworks.franzmanager.services.BrokersService;
-import com.greencomnetworks.franzmanager.services.ConstantsService;
+import com.greencomnetworks.franzmanager.services.ClustersService;
 import com.greencomnetworks.franzmanager.services.KafkaMetricsService;
 import com.greencomnetworks.franzmanager.utils.FUtils;
 import com.greencomnetworks.franzmanager.utils.KafkaUtils;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.kafka.clients.admin.AdminClient;
 import org.apache.kafka.clients.admin.Config;
 import org.apache.kafka.clients.admin.ConfigEntry;
@@ -35,22 +34,10 @@ import java.util.concurrent.ExecutionException;
 public class BrokersResource {
     private static final Logger logger = LoggerFactory.getLogger(BrokersResource.class);
 
-    private String clusterId;
     private Cluster cluster;
-    private AdminClient adminClient;
-    private HashMap<String, JMXConnector> jmxConnector;
 
     public BrokersResource(@HeaderParam("clusterId") String clusterId) {
-        if (StringUtils.isEmpty(clusterId)) clusterId = "Default";
-        this.clusterId = clusterId;
-        this.adminClient = AdminClientService.getAdminClient(clusterId);
-        this.jmxConnector = KafkaMetricsService.getJmxConnector(clusterId);
-        for (Cluster cluster : ConstantsService.clusters) {
-            if (StringUtils.equals(cluster.name, clusterId)) {
-                this.cluster = cluster;
-                break;
-            }
-        }
+        this.cluster = ClustersService.getCluster(clusterId);
         if (this.cluster == null) {
             throw new NotFoundException("Cluster not found for id " + clusterId);
         }
@@ -58,25 +45,22 @@ public class BrokersResource {
 
     @GET
     public List<Broker> getBrokers(@QueryParam("withConfiguration") boolean withConfiguration) {
-        logger.info("With configuration " + withConfiguration);
-
-        List<Broker> knownBrokers = BrokersService.getKnownKafkaBrokers(clusterId);
+        AdminClient adminClient = AdminClientService.getAdminClient(cluster);
+        List<Broker> knownBrokers = BrokersService.getKnownKafkaBrokers(cluster);
 
         if (withConfiguration) {
-            knownBrokers.forEach(broker -> { // if broker is okay, admin client should work.
+            for(Broker broker : knownBrokers) {
                 Map<String, String> configs;
                 if (broker.state.equals(Broker.State.OK)) {
                     ConfigResource configResource = new ConfigResource(ConfigResource.Type.BROKER, broker.id);
                     List<ConfigResource> configResources = FUtils.List.of(configResource);
                     try {
-                        AdminClient adminClient = AdminClientService.connectToOneBroker(broker.host + ':' + broker.port);
                         Map<ConfigResource, Config> describeConfigsResult = adminClient.describeConfigs(configResources, new DescribeConfigsOptions().timeoutMs(3000)).all().get();
                         Config config = describeConfigsResult.get(configResource);
                         configs = new HashMap<>();
                         for (ConfigEntry entry : config.entries()) {
                             configs.put(entry.name(), entry.value());
                         }
-                        adminClient.close();
                     } catch (Exception e) {
                         broker.state = Broker.State.BROKEN;
                         configs = null;
@@ -86,11 +70,10 @@ public class BrokersResource {
                 }
                 if (configs == null) {
                     configs = new HashMap<>();
-                    String zkString = ConstantsService.getCluster(clusterId).zookeeperConnectString;
-                    configs.put("zookeeper.connect", zkString);
+                    configs.put("zookeeper.connect", cluster.zookeeperConnectString);
                 }
                 broker.configurations = configs;
-            });
+            }
         }
 
         return knownBrokers;
@@ -99,6 +82,8 @@ public class BrokersResource {
     @GET
     @Path("/{brokerId}")
     public Broker getBroker(@PathParam("brokerId") String brokerId) {
+        AdminClient adminClient = AdminClientService.getAdminClient(cluster);
+        HashMap<String, JMXConnector> jmxConnector = KafkaMetricsService.getJmxConnectors(cluster);
         try {
             Config config = KafkaUtils.describeBrokerConfig(adminClient, brokerId);
             if (config == null) {

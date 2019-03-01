@@ -3,10 +3,9 @@ package com.greencomnetworks.franzmanager.resources;
 import com.greencomnetworks.franzmanager.core.ConflictException;
 import com.greencomnetworks.franzmanager.entities.*;
 import com.greencomnetworks.franzmanager.services.AdminClientService;
-import com.greencomnetworks.franzmanager.services.ConstantsService;
+import com.greencomnetworks.franzmanager.services.ClustersService;
 import com.greencomnetworks.franzmanager.utils.FUtils;
 import com.greencomnetworks.franzmanager.utils.KafkaUtils;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.kafka.clients.CommonClientConfigs;
 import org.apache.kafka.clients.admin.*;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
@@ -33,19 +32,10 @@ import java.util.stream.Collectors;
 public class TopicsResource {
     private static final Logger logger = LoggerFactory.getLogger(TopicsResource.class);
 
-    String clusterId;
     Cluster cluster;
-    AdminClient adminClient;
 
     public TopicsResource(@HeaderParam("clusterId") String clusterId) {
-        this.clusterId = clusterId;
-        this.adminClient = AdminClientService.getAdminClient(this.clusterId);
-        for (Cluster cluster : ConstantsService.clusters) {
-            if (StringUtils.equals(cluster.name, clusterId)) {
-                this.cluster = cluster;
-                break;
-            }
-        }
+        this.cluster = ClustersService.getCluster(clusterId);
         if (this.cluster == null) {
             throw new NotFoundException("Cluster not found for id " + clusterId);
         }
@@ -53,6 +43,7 @@ public class TopicsResource {
 
     @GET
     public List<Topic> getTopics(@QueryParam("idOnly") boolean idOnly, @QueryParam("shortVersion") boolean shortVersion) {
+        AdminClient adminClient = AdminClientService.getAdminClient(cluster);
         KafkaConsumer<byte[], byte[]> consumer = null;
         try {
             Properties config = new Properties();
@@ -118,11 +109,12 @@ public class TopicsResource {
 
     @POST
     public Response createTopic(TopicCreation topic) {
-        if (topicExist(topic.id)) {
+        AdminClient adminClient = AdminClientService.getAdminClient(cluster);
+        if (topicExist(adminClient, topic.id)) {
             throw new ConflictException("This topic (" + topic.id + ") already exist.");
         }
 
-        BrokersResource brokersResource = new BrokersResource(clusterId);
+        BrokersResource brokersResource = new BrokersResource(cluster.name);
         Broker clusterConfig = brokersResource.getBrokers(true).get(0);
 
         int partitions = topic.partitions != null ? topic.partitions : Integer.parseInt(clusterConfig.configurations.get("num.partitions"));
@@ -149,6 +141,7 @@ public class TopicsResource {
     public Topic getTopic(@PathParam("topicId") String topicId) {
         // NOTE: the calls are in sequence instead of being in parallel, which leads to a slower response time, but I don't think it's really an issue here...
         //                                 - lgaillard 01/08/2018
+        AdminClient adminClient = AdminClientService.getAdminClient(cluster);
         KafkaConsumer<byte[], byte[]> consumer = null;
         try {
             Properties consumerConfig = new Properties();
@@ -187,9 +180,11 @@ public class TopicsResource {
     @PUT
     @Path("/{topicId}")
     public Response updateTopicConfig(@PathParam("topicId") String topicId, Map<String, String> configurations) {
-        if (!topicExist(topicId)) {
+        AdminClient adminClient = AdminClientService.getAdminClient(cluster);
+        if (!topicExist(adminClient, topicId)) {
             throw new NotFoundException("This topic (" + topicId + ") doesn't exist.");
         }
+
 
         logger.info("Updating config for '{}': {}", topicId, configurations);
 
@@ -210,7 +205,8 @@ public class TopicsResource {
     @DELETE
     @Path("/{topicId}")
     public Response deleteTopic(@PathParam("topicId") String topicId) {
-        if (!topicExist(topicId)) {
+        AdminClient adminClient = AdminClientService.getAdminClient(cluster);
+        if (!topicExist(adminClient, topicId)) {
             throw new NotFoundException("This topic (" + topicId + ") doesn't exist.");
         }
 
@@ -227,7 +223,8 @@ public class TopicsResource {
     @GET
     @Path("/{topicId}/partitions")
     public List<Partition> getTopicPartitions(@PathParam("topicId") String topicId) {
-        if (!topicExist(topicId)) {
+        AdminClient adminClient = AdminClientService.getAdminClient(cluster);
+        if (!topicExist(adminClient, topicId)) {
             throw new NotFoundException("This topic (" + topicId + ") doesn't exist.");
         }
 
@@ -254,6 +251,7 @@ public class TopicsResource {
     @POST
     @Path("/{topicId}/partitions")
     public Response postTopicPartitions(@PathParam("topicId") String topicId, @QueryParam("quantity") Integer quantity) {
+        AdminClient adminClient = AdminClientService.getAdminClient(cluster);
         TopicDescription topicDescription = KafkaUtils.describeTopic(adminClient, topicId);
         if (topicDescription == null) {
             throw new NotFoundException("This topic (" + topicId + ") doesn't exist.");
@@ -272,7 +270,7 @@ public class TopicsResource {
     }
 
 
-    private boolean topicExist(String id) {
+    private boolean topicExist(AdminClient adminClient, String id) {
         return KafkaUtils.describeTopic(adminClient, id) != null;
     }
 

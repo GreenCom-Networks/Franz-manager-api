@@ -5,7 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.greencomnetworks.franzmanager.entities.Cluster;
 import com.greencomnetworks.franzmanager.entities.Message;
 import com.greencomnetworks.franzmanager.services.AdminClientService;
-import com.greencomnetworks.franzmanager.services.ConstantsService;
+import com.greencomnetworks.franzmanager.services.ClustersService;
 import com.greencomnetworks.franzmanager.utils.CustomObjectMapper;
 import com.greencomnetworks.franzmanager.utils.KafkaUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -19,7 +19,6 @@ import org.apache.kafka.common.errors.WakeupException;
 import org.apache.kafka.common.serialization.Deserializer;
 import org.apache.kafka.common.serialization.Serdes;
 import org.glassfish.grizzly.http.HttpRequestPacket;
-import org.glassfish.grizzly.http.util.MimeHeaders;
 import org.glassfish.grizzly.websockets.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -104,19 +103,24 @@ public class LiveMessagesResource extends WebSocketApplication {
     private void newSocketConsumer(WebSocket socket, String topic, String clusterId) {
         logger.info("New subscription from '{}': Cluster:'{}' - Topic:'{}'", socket, clusterId, topic);
 
-        AdminClient adminClient = AdminClientService.getAdminClient(clusterId);
+        Cluster cluster = ClustersService.getCluster(clusterId);
+        if(cluster == null) {
+            logger.warn("Trying to subscribe to an unknown cluster: {}", clusterId);
+        }
+
+        AdminClient adminClient = AdminClientService.getAdminClient(cluster);
         if(KafkaUtils.describeTopic(adminClient, topic) == null) {
-            logger.warn("Trying to subscribe to an unknown topic: '{}' on '{}'", topic, clusterId);
+            logger.warn("Trying to subscribe to an unknown topic: '{}' on '{}'", topic, cluster.name);
             socket.close();
             return;
         }
 
         // Close previous subscription if there was one.
         {
-            FranzConsumer c = franzConsumers.get(socket);
-            if(c != null) {
-                logger.warn("Multiple subscription on same ws '{}'. Closing consumer {}.", socket, c.id);
-                c.shutdown();
+            FranzConsumer consumer = franzConsumers.get(socket);
+            if(consumer != null) {
+                logger.warn("Multiple subscription on same ws '{}'. Closing consumer {}.", socket, consumer.id);
+                consumer.shutdown();
             }
         }
         FranzConsumer franzConsumer = new FranzConsumer("franz-manager-api_live", topic, socket, clusterId);
@@ -145,7 +149,7 @@ public class LiveMessagesResource extends WebSocketApplication {
             this.topic = topic;
             this.socket = socket;
             Cluster cluster = null;
-            for (Cluster c : ConstantsService.clusters) {
+            for (Cluster c : ClustersService.clusters) {
                 if (StringUtils.equals(c.name, clusterId)) {
                     cluster = c;
                     break;

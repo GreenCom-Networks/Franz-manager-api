@@ -1,6 +1,7 @@
 package com.greencomnetworks.franzmanager.services;
 
 import com.greencomnetworks.franzmanager.entities.Broker;
+import com.greencomnetworks.franzmanager.entities.Cluster;
 import com.greencomnetworks.franzmanager.entities.Metric;
 import com.greencomnetworks.franzmanager.resources.BrokersResource;
 import com.greencomnetworks.franzmanager.utils.FUtils;
@@ -27,12 +28,8 @@ public class TopicMetricsService {
         new Thread(new CheckMetrics(), "CheckMetrics").start();
     }
 
-    public static HashMap<String, HashMap<String, Metric>> getTopicsMetrics(String clusterId) {
-        if (clusterId == null) {
-            return null;
-        }
-
-        return topicMetrics.get(clusterId);
+    public static HashMap<String, HashMap<String, Metric>> getTopicsMetrics(Cluster cluster) {
+        return topicMetrics.get(cluster.name);
     }
 
     private static class CheckMetrics implements Runnable {
@@ -41,16 +38,14 @@ public class TopicMetricsService {
                 try {
                     Thread.sleep(15000); // wait 15 sc before first try.
 
-                    HashMap<String, HashMap<String, JMXConnector>> jmxConnector = KafkaMetricsService.getJmxConnectors();
-
-                    for (String clusterId : jmxConnector.keySet()) { // for each clusters;
-                        HashMap<String, JMXConnector> jmxConnectors = jmxConnector.get(clusterId);
-                        AdminClient adminClient = AdminClientService.getAdminClient(clusterId);
+                    for(Cluster cluster : ClustersService.clusters) {
+                        HashMap<String, JMXConnector> jmxConnectors = KafkaMetricsService.getJmxConnectors(cluster);
+                        AdminClient adminClient = AdminClientService.getAdminClient(cluster);
                         ListTopicsOptions listTopicsOptions = new ListTopicsOptions().listInternal(true);
                         Set<String> topics = adminClient.listTopics(listTopicsOptions).names().get();
 
 
-                        List<Broker> knownBrokers = BrokersService.getKnownKafkaBrokers(clusterId);
+                        List<Broker> knownBrokers = BrokersService.getKnownKafkaBrokers(cluster);
                         HashMap<String, HashMap<String, Metric>> clusterTopicsMetrics = new HashMap<>();
 
                         topics.forEach(topic -> {
@@ -86,7 +81,7 @@ public class TopicMetricsService {
                             clusterTopicsMetrics.put(topic, brokerTopicMetrics);
                         });
 
-                        topicMetrics.put(clusterId, clusterTopicsMetrics);
+                        topicMetrics.put(cluster.name, clusterTopicsMetrics);
                     }
                     Thread.sleep(30000); // every 5 minutes
                 } catch (InterruptedException | ExecutionException e) {

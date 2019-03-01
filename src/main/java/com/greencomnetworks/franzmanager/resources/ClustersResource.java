@@ -1,7 +1,7 @@
 package com.greencomnetworks.franzmanager.resources;
 
 import com.greencomnetworks.franzmanager.entities.Cluster;
-import com.greencomnetworks.franzmanager.services.ConstantsService;
+import com.greencomnetworks.franzmanager.services.ClustersService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -20,6 +20,6 @@ public class ClustersResource {
 
     @GET
     public List<Cluster> getClusters() {
-        return ConstantsService.clusters;
+        return ClustersService.clusters;
     }
 }

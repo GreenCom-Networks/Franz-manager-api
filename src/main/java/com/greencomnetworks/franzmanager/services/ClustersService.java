@@ -11,15 +11,13 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.util.List;
 
-public class ConstantsService {
+public class ClustersService {
     private static final Logger logger = LoggerFactory.getLogger(KafkaMetricsService.class);
 
     public static List<Cluster> clusters;
 
-    public static void init() throws RuntimeException {
-        logger.debug("Checking constants...");
+    public static void init() throws ConfigException {
         String KAFKA_CONF = System.getenv("KAFKA_CONF");
-
         if (KAFKA_CONF == null) {
             throw new ConfigException("Missing environment variable KAFKA_CONF.");
         }
@@ -39,7 +37,8 @@ public class ConstantsService {
         }
     }
 
-    public static Cluster getCluster(String clusterId){
+    public static Cluster getCluster(String clusterId) {
+        if(clusterId == null && clusters.size() == 1) return clusters.get(0);
         for(Cluster cluster : clusters) {
             if(StringUtils.equals(cluster.name, clusterId)) return cluster;
         }

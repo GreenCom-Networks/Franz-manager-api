@@ -3,7 +3,7 @@ package com.greencomnetworks.franzmanager.resources;
 import com.greencomnetworks.franzmanager.entities.Cluster;
 import com.greencomnetworks.franzmanager.entities.Message;
 import com.greencomnetworks.franzmanager.services.AdminClientService;
-import com.greencomnetworks.franzmanager.services.ConstantsService;
+import com.greencomnetworks.franzmanager.services.ClustersService;
 import com.greencomnetworks.franzmanager.utils.FUtils;
 import com.greencomnetworks.franzmanager.utils.KafkaUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -31,19 +31,10 @@ import java.util.stream.Collectors;
 public class MessagesResource {
     private static final Logger logger = LoggerFactory.getLogger(MessagesResource.class);
 
-    private String clusterId;
     private Cluster cluster;
-    private AdminClient adminClient;
 
     public MessagesResource(@HeaderParam("clusterId") String clusterId){
-        this.clusterId = clusterId;
-        this.adminClient = AdminClientService.getAdminClient(this.clusterId);
-        for (Cluster cluster : ConstantsService.clusters) {
-            if(StringUtils.equals(cluster.name, clusterId)){
-                this.cluster = cluster;
-                break;
-            }
-        }
+        this.cluster = ClustersService.getCluster(clusterId);
         if(this.cluster == null){
             throw new NotFoundException("Cluster not found for id " + clusterId);
         }
@@ -52,6 +43,7 @@ public class MessagesResource {
     public List<Message> getMessages(@PathParam("topicId") String topicId,
                               @DefaultValue("10") @QueryParam("quantity") Integer quantity,
                               @QueryParam("from") Long from) {
+        AdminClient adminClient = AdminClientService.getAdminClient(cluster);
         TopicDescription topicDescription = KafkaUtils.describeTopic(adminClient, topicId);
         if (topicDescription == null) {
             throw new NotFoundException("This topic (" + topicId + ") doesn't exist.");

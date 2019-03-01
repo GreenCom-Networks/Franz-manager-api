@@ -2,7 +2,7 @@ package com.greencomnetworks.franzmanager.resources;
 
 import com.greencomnetworks.franzmanager.entities.Cluster;
 import com.greencomnetworks.franzmanager.entities.ConsumerOffsetRecord;
-import com.greencomnetworks.franzmanager.services.ConstantsService;
+import com.greencomnetworks.franzmanager.services.ClustersService;
 import com.greencomnetworks.franzmanager.services.KafkaConsumerOffsetReader;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
@@ -20,17 +20,10 @@ import java.util.Collection;
 public class ConsumerResource {
     private static final Logger log = LoggerFactory.getLogger(ConsumerResource.class);
 
-    String clusterId;
     Cluster cluster;
 
     public ConsumerResource(@HeaderParam("clusterId") String clusterId){
-        this.clusterId = clusterId;
-        for (Cluster cluster : ConstantsService.clusters) {
-            if(StringUtils.equals(cluster.name, clusterId)){
-                this.cluster = cluster;
-                break;
-            }
-        }
+        this.cluster = ClustersService.getCluster(clusterId);
         if(this.cluster == null){
             throw new NotFoundException("Cluster not found for id " + clusterId);
         }
@@ -38,7 +31,7 @@ public class ConsumerResource {
 
     @GET
     public Collection<ConsumerOffsetRecord> get(@QueryParam("group") String group, @QueryParam("topic") String topic){
-        Collection<ConsumerOffsetRecord> result = KafkaConsumerOffsetReader.getInstance().getConsumerOffsetRecords(clusterId);
+        Collection<ConsumerOffsetRecord> result = KafkaConsumerOffsetReader.getInstance().getConsumerOffsetRecords(cluster);
 
         if(null != group){
             result = filterByGroup(result, group);

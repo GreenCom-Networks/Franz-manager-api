@@ -16,6 +16,7 @@ import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.errors.WakeupException;
+import org.apache.kafka.common.header.Header;
 import org.apache.kafka.common.serialization.Deserializer;
 import org.apache.kafka.common.serialization.Serdes;
 import org.glassfish.grizzly.http.HttpRequestPacket;
@@ -24,6 +25,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.ws.rs.NotFoundException;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.*;
 
@@ -182,8 +184,20 @@ public class LiveMessagesResource extends WebSocketApplication {
                     ConsumerRecords<String, String> records = consumer.poll(Duration.ofMillis(1000));
                     List<Message> messages = new ArrayList<>();
                     for (ConsumerRecord<String, String> record : records) {
-                        Message message = new Message(record.value(), record.key(), record.partition(), record.offset(), record.timestamp(), record.headers());
-                        messages.add(message);
+                        Map<String, List<String>> headers = new HashMap<>();
+                        for(Header header : record.headers()) {
+                            List<String> currentValues = headers.computeIfAbsent(header.key(), k -> new ArrayList<>(1));
+                            currentValues.add(new String(header.value(), StandardCharsets.UTF_8));
+                        }
+                        messages.add(new Message(
+                            record.topic(),
+                            record.partition(),
+                            record.offset(),
+                            record.timestamp(),
+                            headers,
+                            record.key(),
+                            record.value()
+                        ));
                     }
                     if (messages.size() > 0) {
                         logger.trace("{}: consumed {} message(s)", this.id, messages.size());

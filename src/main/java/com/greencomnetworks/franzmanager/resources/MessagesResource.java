@@ -9,11 +9,9 @@ import com.greencomnetworks.franzmanager.utils.KafkaUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.kafka.clients.admin.AdminClient;
 import org.apache.kafka.clients.admin.TopicDescription;
-import org.apache.kafka.clients.consumer.Consumer;
-import org.apache.kafka.clients.consumer.ConsumerConfig;
-import org.apache.kafka.clients.consumer.ConsumerRecords;
-import org.apache.kafka.clients.consumer.KafkaConsumer;
+import org.apache.kafka.clients.consumer.*;
 import org.apache.kafka.common.TopicPartition;
+import org.apache.kafka.common.header.Header;
 import org.apache.kafka.common.serialization.Deserializer;
 import org.apache.kafka.common.serialization.Serdes;
 import org.slf4j.Logger;
@@ -21,6 +19,8 @@ import org.slf4j.LoggerFactory;
 
 import javax.ws.rs.*;
 import javax.ws.rs.core.MediaType;
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -106,9 +106,23 @@ public class MessagesResource {
                     noRecordsCount++;
                     if (noRecordsCount > giveUp) break;
                 } else {
-                    consumerRecords.forEach(record -> {
-                        messages.add(new Message(record.value(), record.key(), record.partition(), record.offset(), record.timestamp(), record.headers()));
-                    });
+                    for(ConsumerRecord<String, String> record : consumerRecords) {
+                        Map<String, List<String>> headers = new HashMap<>();
+
+                        for(Header header : record.headers()) {
+                            List<String> currentValues = headers.computeIfAbsent(header.key(), k -> new ArrayList<>(1));
+                            currentValues.add(new String(header.value(), StandardCharsets.UTF_8));
+                        }
+                        messages.add(new Message(
+                            record.topic(),
+                            record.partition(),
+                            record.offset(),
+                            record.timestamp(),
+                            headers,
+                            record.key(),
+                            record.value()
+                        ));
+                    }
                     if (from == null && messages.size() >= topicPartitions.size() * quantity) break;
                 }
             }

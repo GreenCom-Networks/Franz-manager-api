@@ -5,7 +5,7 @@ import java.time.ZonedDateTime;
 public class ConsumerOffsetRecord {
     public String group;
     public String topic;
-    public Integer partition;
+    public int partition;
 
     public ZonedDateTime timestamp;  // Timestamp at which we read the entry. Confusing name...
 

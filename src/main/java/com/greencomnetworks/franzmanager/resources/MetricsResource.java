@@ -65,7 +65,7 @@ public class MetricsResource {
                 String host = brokerHost.split(":")[0];
                 int port = Integer.parseInt(brokerHost.split(":")[1]);
                 logger.warn(host + " , " + port);
-                Broker currentBroker = FUtils.findInCollection(knownKafkaBrokers, b -> b.jmxPort.equals(port) && b.host.equals(host));
+                Broker currentBroker = FUtils.findInCollection(knownKafkaBrokers, b -> b.jmxPort == port && b.host.equals(host));
                 Metric metric = new Metric(metricType, metricName, Integer.parseInt(currentBroker.id), new HashMap<>());
                 MBeanInfo beanInfo = mbsc.getMBeanInfo(objName);
                 for (MBeanAttributeInfo attr : beanInfo.getAttributes()) {

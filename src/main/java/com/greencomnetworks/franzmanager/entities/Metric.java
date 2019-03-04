@@ -1,17 +1,15 @@
 package com.greencomnetworks.franzmanager.entities;
 
-import com.fasterxml.jackson.annotation.JsonCreator;
-
-import java.util.HashMap;
+import java.util.Map;
 
 public class Metric {
-    public final String type;
-    public final String name;
-    public final int brokerId;
-    public final HashMap<String, Object> metrics;
+    public String type;
+    public String name;
+    public int brokerId;
+    public Map<String, Object> metrics;
 
-    @JsonCreator
-    public Metric(String type, String name, int brokerId, HashMap<String, Object> metrics) {
+    public Metric() {}
+    public Metric(String type, String name, int brokerId, Map<String, Object> metrics) {
         this.type = type;
         this.name = name;
         this.brokerId = brokerId;

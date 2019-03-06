@@ -45,6 +45,7 @@ public class MetricsResource {
             throw new BadRequestException("Missing query parameter 'metricType'");
         }
 
+        // TODO: SECURITY: a malicious query might be formed because of the way we're building it...
         String queryString = metricLocation + ":";
         queryString += "type=" + metricType;
         if (metricName != null && !metricName.equals("HeapMemoryUsage")) {
@@ -64,7 +65,6 @@ public class MetricsResource {
                 MBeanServerConnection mbsc = jmxConnectors.get(brokerHost).getMBeanServerConnection();
                 String host = brokerHost.split(":")[0];
                 int port = Integer.parseInt(brokerHost.split(":")[1]);
-                logger.warn(host + " , " + port);
                 Broker currentBroker = FUtils.findInCollection(knownKafkaBrokers, b -> b.jmxPort == port && b.host.equals(host));
                 Metric metric = new Metric(metricType, metricName, Integer.parseInt(currentBroker.id), new HashMap<>());
                 MBeanInfo beanInfo = mbsc.getMBeanInfo(objName);
@@ -74,7 +74,6 @@ public class MetricsResource {
                         Arrays.stream(new String[]{"committed", "init", "max", "used"}).forEach(key -> {
                             metric.metrics.put(key, cd.get(key));
                         });
-                        logger.warn(cd.values().toString());
                     } else {
                         Object value = mbsc.getAttribute(objName, attr.getName());
                         if (NumberUtils.isCreatable(String.valueOf(value))) {
@@ -101,7 +100,7 @@ public class MetricsResource {
 
     @Path("/topics")
     @GET
-    public HashMap<String, HashMap<String, Metric>> getTopicsMetric() {
+    public Map<String, Map<String, Metric>> getTopicsMetric() {
         return TopicMetricsService.getTopicsMetrics(cluster);
     }
 }

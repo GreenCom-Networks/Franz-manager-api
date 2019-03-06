@@ -16,19 +16,20 @@ import javax.management.remote.JMXConnector;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ExecutionException;
 
 public class TopicMetricsService {
     private static final Logger logger = LoggerFactory.getLogger(BrokersResource.class);
-    private static HashMap<String, HashMap<String, HashMap<String, Metric>>> topicMetrics = new HashMap<>();
+    private static Map<String, Map<String, Map<String, Metric>>> topicMetrics = new HashMap<>();
 
     public static void init() {
         topicMetrics = new HashMap<>();
         new Thread(new CheckMetrics(), "CheckMetrics").start();
     }
 
-    public static HashMap<String, HashMap<String, Metric>> getTopicsMetrics(Cluster cluster) {
+    public static Map<String, Map<String, Metric>> getTopicsMetrics(Cluster cluster) {
         return topicMetrics.get(cluster.name);
     }
 
@@ -39,17 +40,17 @@ public class TopicMetricsService {
                     Thread.sleep(15000); // wait 15 sc before first try.
 
                     for(Cluster cluster : ClustersService.clusters) {
-                        HashMap<String, JMXConnector> jmxConnectors = KafkaMetricsService.getJmxConnectors(cluster);
+                        Map<String, JMXConnector> jmxConnectors = KafkaMetricsService.getJmxConnectors(cluster);
                         AdminClient adminClient = AdminClientService.getAdminClient(cluster);
                         ListTopicsOptions listTopicsOptions = new ListTopicsOptions().listInternal(true);
                         Set<String> topics = adminClient.listTopics(listTopicsOptions).names().get();
 
 
                         List<Broker> knownBrokers = BrokersService.getKnownKafkaBrokers(cluster);
-                        HashMap<String, HashMap<String, Metric>> clusterTopicsMetrics = new HashMap<>();
+                        Map<String, Map<String, Metric>> clusterTopicsMetrics = new HashMap<>();
 
                         topics.forEach(topic -> {
-                            HashMap<String, Metric> brokerTopicMetrics = new HashMap<>();
+                            Map<String, Metric> brokerTopicMetrics = new HashMap<>();
 
                             for (String brokerHost : jmxConnectors.keySet()) { // for each brokers.
                                 try {

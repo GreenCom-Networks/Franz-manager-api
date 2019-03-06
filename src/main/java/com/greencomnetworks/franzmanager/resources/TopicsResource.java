@@ -44,29 +44,46 @@ public class TopicsResource {
     @GET
     public List<Topic> getTopics(@QueryParam("idOnly") boolean idOnly, @QueryParam("shortVersion") boolean shortVersion) {
         AdminClient adminClient = AdminClientService.getAdminClient(cluster);
-        KafkaConsumer<byte[], byte[]> consumer = null;
+
+        Set<String> topics;
         try {
-            Properties config = new Properties();
-            config.put(CommonClientConfigs.BOOTSTRAP_SERVERS_CONFIG, cluster.brokersConnectString);
-            Deserializer<byte[]> deserializer = Serdes.ByteArray().deserializer();
-            consumer = new KafkaConsumer<>(config, deserializer, deserializer);
             ListTopicsOptions listTopicsOptions = new ListTopicsOptions();
             listTopicsOptions.listInternal(true);
-            Set<String> topics = adminClient.listTopics(listTopicsOptions).names().get();
+            topics = adminClient.listTopics(listTopicsOptions).names().get();
+        } catch(InterruptedException e) {
+            throw new RuntimeException(e);
+        } catch(ExecutionException e) {
+            throw new RuntimeException(e.getCause());
+        }
 
-            // return only id
-            if (idOnly) {
-                return topics.stream().map(t -> new Topic(t)).collect(Collectors.toList());
-            }
+        // return only id
+        if (idOnly) {
+            return topics.stream().map(t -> new Topic(t)).collect(Collectors.toList());
+        }
 
+        Map<String, TopicDescription> describedTopics;
+        Map<ConfigResource, Config> describedConfigs;
+        try {
             // need 2 kafka objects to get a complete topic descriptions
             List<ConfigResource> configResources = topics.stream().map(t -> new ConfigResource(ConfigResource.Type.TOPIC, t)).collect(Collectors.toList());
 
             KafkaFuture<Map<String, TopicDescription>> describedTopicsFuture = adminClient.describeTopics(topics).all();
             KafkaFuture<Map<ConfigResource, Config>> describedConfigsFuture = adminClient.describeConfigs(configResources).all();
 
-            Map<String, TopicDescription> describedTopics = describedTopicsFuture.get();
-            Map<ConfigResource, Config> describedConfigs = describedConfigsFuture.get();
+            describedTopics = describedTopicsFuture.get();
+            describedConfigs = describedConfigsFuture.get();
+        } catch(InterruptedException e) {
+            throw new RuntimeException(e);
+        } catch(ExecutionException e) {
+            throw new RuntimeException(e.getCause());
+        }
+
+        KafkaConsumer<byte[], byte[]> consumer = null;
+        try {
+            Properties config = new Properties();
+            config.put(CommonClientConfigs.BOOTSTRAP_SERVERS_CONFIG, cluster.brokersConnectString);
+            Deserializer<byte[]> deserializer = Serdes.ByteArray().deserializer();
+            consumer = new KafkaConsumer<>(config, deserializer, deserializer);
 
             Set<TopicPartition> topicsPartitions = new HashSet<>();
             describedTopics.forEach((topicName, td) -> td.partitions().forEach(tpi -> topicsPartitions.add(new TopicPartition(topicName, tpi.partition()))));
@@ -75,31 +92,27 @@ public class TopicsResource {
             Map<TopicPartition, Long> topicsPartitionsEndOffsets = consumer.endOffsets(topicsPartitions);
 
             List<Topic> completeTopics = describedConfigs.entrySet().stream()
-                    .map(entry -> {
-                        String topicName = entry.getKey().name();
-                        TopicDescription describedTopic = describedTopics.get(topicName);
+                .map(entry -> {
+                    String topicName = entry.getKey().name();
+                    TopicDescription describedTopic = describedTopics.get(topicName);
 
-                        Map<String, String> configurations = null;
-                        if (!shortVersion) {
-                            configurations = entry.getValue().entries().stream()
-                                    .collect(Collectors.toMap(
-                                            ConfigEntry::name,
-                                            ConfigEntry::value
-                                    ));
-                        }
-                        List<Partition> topicPartitions = describedTopic.partitions().stream()
-                                .map(topicPartitionInfo -> {
-                                    TopicPartition tp = new TopicPartition(topicName, topicPartitionInfo.partition());
-                                    return new Partition(topicName, topicsPartitionsBeginningOffsets.get(tp), topicsPartitionsEndOffsets.get(tp), topicPartitionInfo, null);
-                                }).collect(Collectors.toList());
-                        return new Topic(topicName, topicPartitions, configurations);
-                    }).collect(Collectors.toList());
+                    Map<String, String> configurations = null;
+                    if(!shortVersion) {
+                        configurations = entry.getValue().entries().stream()
+                            .collect(Collectors.toMap(
+                                ConfigEntry::name,
+                                ConfigEntry::value
+                            ));
+                    }
+                    List<Partition> topicPartitions = describedTopic.partitions().stream()
+                        .map(topicPartitionInfo -> {
+                            TopicPartition tp = new TopicPartition(topicName, topicPartitionInfo.partition());
+                            return new Partition(topicName, topicsPartitionsBeginningOffsets.get(tp), topicsPartitionsEndOffsets.get(tp), topicPartitionInfo, null);
+                        }).collect(Collectors.toList());
+                    return new Topic(topicName, topicPartitions, configurations);
+                }).collect(Collectors.toList());
 
             return completeTopics;
-        } catch (InterruptedException e) {
-            throw new RuntimeException(e);
-        } catch (ExecutionException e) {
-            throw new RuntimeException(e.getCause());
         } finally {
             if (consumer != null) {
                 consumer.close();
@@ -142,39 +155,14 @@ public class TopicsResource {
         // NOTE: the calls are in sequence instead of being in parallel, which leads to a slower response time, but I don't think it's really an issue here...
         //                                 - lgaillard 01/08/2018
         AdminClient adminClient = AdminClientService.getAdminClient(cluster);
-        KafkaConsumer<byte[], byte[]> consumer = null;
-        try {
-            Properties consumerConfig = new Properties();
-            consumerConfig.put(CommonClientConfigs.BOOTSTRAP_SERVERS_CONFIG, cluster.brokersConnectString);
-            Deserializer<byte[]> deserializer = Serdes.ByteArray().deserializer();
-            consumer = new KafkaConsumer<>(consumerConfig, deserializer, deserializer);
-            TopicDescription topicDescription = KafkaUtils.describeTopic(adminClient, topicId);
-            Config config = KafkaUtils.describeTopicConfig(adminClient, topicId);
-
-            if (topicDescription == null || config == null) {
-                throw new NotFoundException("This topic (" + topicId + ") doesn't exist.");
-            }
-
-            Map<String, String> configurations = config.entries().stream().collect(Collectors.toMap(
-                    ConfigEntry::name,
-                    ConfigEntry::value
-            ));
-            Set<TopicPartition> topicsPartitions = new HashSet<>();
-            topicDescription.partitions().forEach(tpi -> topicsPartitions.add(new TopicPartition(topicId, tpi.partition())));
-            Map<TopicPartition, Long> topicPartitionsBeginningOffsets = consumer.beginningOffsets(topicsPartitions);
-            Map<TopicPartition, Long> topicPartitionsEndOffsets = consumer.endOffsets(topicsPartitions);
-
-            List<Partition> topicPartitions = topicDescription.partitions().stream()
-                    .map(topicPartitionInfo -> {
-                        TopicPartition tp = new TopicPartition(topicId, topicPartitionInfo.partition());
-                        return new Partition(topicId, topicPartitionsBeginningOffsets.get(tp), topicPartitionsEndOffsets.get(tp), topicPartitionInfo, null);
-                    }).collect(Collectors.toList());
-            return new Topic(topicId, topicPartitions, configurations);
-        } finally {
-            if (consumer != null) {
-                consumer.close();
-            }
+        if(!topicExist(adminClient, topicId)) {
+            throw new NotFoundException("This topic (" + topicId + ") doesn't exist.");
         }
+
+        Map<String, String> configurations = retrieveConfigurations(adminClient, topicId);
+        List<Partition> partitions = retrievePartitions(topicId);
+
+        return new Topic(topicId, partitions, configurations);
     }
 
     @PUT
@@ -184,7 +172,6 @@ public class TopicsResource {
         if (!topicExist(adminClient, topicId)) {
             throw new NotFoundException("This topic (" + topicId + ") doesn't exist.");
         }
-
 
         logger.info("Updating config for '{}': {}", topicId, configurations);
 
@@ -228,24 +215,7 @@ public class TopicsResource {
             throw new NotFoundException("This topic (" + topicId + ") doesn't exist.");
         }
 
-        Properties config = new Properties();
-        config.put(CommonClientConfigs.BOOTSTRAP_SERVERS_CONFIG, cluster.brokersConnectString);
-        Deserializer<byte[]> deserializer = Serdes.ByteArray().deserializer();
-        KafkaConsumer<byte[], byte[]> consumer = new KafkaConsumer<>(config, deserializer, deserializer);
-        try {
-            List<PartitionInfo> partitionInfos = consumer.partitionsFor(topicId);
-            List<TopicPartition> topicPartitions = partitionInfos.stream().map(pi -> new TopicPartition(pi.topic(), pi.partition())).collect(Collectors.toList());
-            Map<TopicPartition, Long> offsetsBeginning = consumer.beginningOffsets(topicPartitions);
-            Map<TopicPartition, Long> offsetsEnd = consumer.endOffsets(topicPartitions);
-
-            return partitionInfos.stream().map(pi -> {
-                TopicPartition tp = new TopicPartition(pi.topic(), pi.partition());
-                return new Partition(tp.topic(), tp.partition(), offsetsBeginning.get(tp), offsetsEnd.get(tp),
-                        pi.leader().id(), nodesToInts(pi.replicas()), nodesToInts(pi.inSyncReplicas()), nodesToInts(pi.offlineReplicas()));
-            }).collect(Collectors.toList());
-        } finally {
-            consumer.close();
-        }
+        return retrievePartitions(topicId);
     }
 
     @POST
@@ -274,7 +244,36 @@ public class TopicsResource {
         return KafkaUtils.describeTopic(adminClient, id) != null;
     }
 
+    private Map<String, String> retrieveConfigurations(AdminClient adminClient, String topicId) {
+        return KafkaUtils.describeTopicConfig(adminClient, topicId).entries().stream()
+            .collect(Collectors.toMap(
+                ConfigEntry::name,
+                ConfigEntry::value
+            ));
+    }
+
+    private List<Partition> retrievePartitions(String topicId) {
+        Properties config = new Properties();
+        config.put(CommonClientConfigs.BOOTSTRAP_SERVERS_CONFIG, cluster.brokersConnectString);
+        Deserializer<byte[]> deserializer = Serdes.ByteArray().deserializer();
+        KafkaConsumer<byte[], byte[]> consumer = new KafkaConsumer<>(config, deserializer, deserializer);
+        try {
+            List<PartitionInfo> partitionInfos = consumer.partitionsFor(topicId);
+            List<TopicPartition> topicPartitions = partitionInfos.stream().map(pi -> new TopicPartition(pi.topic(), pi.partition())).collect(Collectors.toList());
+            Map<TopicPartition, Long> offsetsBeginning = consumer.beginningOffsets(topicPartitions);
+            Map<TopicPartition, Long> offsetsEnd = consumer.endOffsets(topicPartitions);
+
+            return partitionInfos.stream().map(pi -> {
+                TopicPartition tp = new TopicPartition(pi.topic(), pi.partition());
+                return new Partition(tp.topic(), tp.partition(), offsetsBeginning.get(tp), offsetsEnd.get(tp),
+                    pi.leader().id(), nodesToInts(pi.replicas()), nodesToInts(pi.inSyncReplicas()), nodesToInts(pi.offlineReplicas()));
+            }).collect(Collectors.toList());
+        } finally {
+            consumer.close();
+        }
+    }
+
     private int[] nodesToInts(Node[] nodes) {
-        return Arrays.stream(nodes).mapToInt(node -> node.id()).toArray();
+        return Arrays.stream(nodes).mapToInt(Node::id).toArray();
     }
 }

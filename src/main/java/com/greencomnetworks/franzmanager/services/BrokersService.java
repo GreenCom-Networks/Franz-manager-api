@@ -88,7 +88,7 @@ public class BrokersService {
                 List<String> brokerIds = zooKeeper.getChildren("/brokers/ids", false);
                 for(String brokerId : brokerIds) {
                     byte[] zkData = zooKeeper.getData("/brokers/ids/" + brokerId, false, null);
-                    ZkKafkaBroker zkKafkaBroker = new CustomObjectMapper().readValue(zkData, ZkKafkaBroker.class);
+                    ZkKafkaBroker zkKafkaBroker = new CustomObjectMapper().readValue(zkData, ZkKafkaBroker.class); // SPEED: reuse objectMapper?
                     String host;
                     {
                         String[] split = zkKafkaBroker.host.split(":");
